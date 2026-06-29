@@ -1,0 +1,7 @@
+TODO:
+
+1. Try to complete the embedding pipeline specifically create and load album
+2. Think about how the query code strucutre will be
+3. On frontend get the plugin and a simple button to be ready to test the albumn thing
+4. Either skip or do a naive way for the albumn name + specificlaly the description
+   one naive way is to have a json file that maps desc to albumn name and BE will read it and return all the possible selections (also can maybe store the root path as well)
