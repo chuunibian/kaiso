@@ -49,7 +49,7 @@ impl BackendState {
         let mut tok = self.tokenizer.lock().map_err(|e| e.to_string())?;
         if tok.is_none() {
             *tok = Some(
-                AppTokenizer::new("../model_exporter/clip_onnx_mobile/tokenizer.json").unwrap(),
+                AppTokenizer::new("../../model_exporter/clip_onnx_mobile/tokenizer.json").unwrap(),
             );
         }
         Ok(())
@@ -65,7 +65,7 @@ impl BackendState {
         let mut vm = self.vision_model.lock().map_err(|e| e.to_string())?;
         if vm.is_none() {
             *vm = Some(
-                ClipVisionModel::new("../model_exporter/clip_onnx_mobile/vision_model.onnx")
+                ClipVisionModel::new("../../model_exporter/clip_onnx_mobile/vision_model.onnx")
                     .unwrap(),
             );
         };
@@ -76,7 +76,8 @@ impl BackendState {
         let mut tm = self.text_model.lock().map_err(|e| e.to_string())?;
         if tm.is_none() {
             *tm = Some(
-                ClipTextModel::new("../model_exporter/clip_onnx_mobile/text_model.onnx").unwrap(),
+                ClipTextModel::new("../../model_exporter/clip_onnx_mobile/text_model.onnx")
+                    .unwrap(),
             );
         };
         Ok(())
@@ -171,8 +172,17 @@ pub struct AlbumView {
     pub name: String,
     pub description: String,
     pub path: PathBuf,
+    pub date: SystemTime,
 }
 
+// just for putting in and out of json file
+#[derive(Serialize, Deserialize)]
+pub struct JsonAlbum {
+    pub name: String,
+    pub description: String,
+    pub date: SystemTime,
+    pub root_path: String,
+}
 
 #[derive(Serialize, Clone)]
 struct LogEntry {

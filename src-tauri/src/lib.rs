@@ -21,6 +21,47 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .register_uri_scheme_protocol("kaiso", |ctx, request| {
+            // register thumbnail custom protocol
+            // registers basically a lambda to do that
+            let path = request.uri().path(); // thumb: "/thumb/{workspace}/{id}"  full: "/full/{filepath...}"
+            let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+
+            let state = ctx.app_handle().state::<Arc<BackendState>>();
+
+            let file = match parts.get(0) {
+                Some(&"thumb") => {
+                    let (workspace, id) = match (parts.get(1), parts.get(2)) { // parse parts it is also possible weird stuff is passed in that might break it so
+                        (Some(ws), Some(id)) => (*ws, *id),
+                        _ => return tauri::http::Response::builder()
+                            .status(404)
+                            .body(Vec::new())
+                            .unwrap(),
+                    };
+                    let dir = state.local_thumbnail_storage_path.as_ref().unwrap();
+                    dir.join(workspace).join(format!("{id}.jpg"))
+                }
+                Some(&"full") => {
+                    // rejoin everything after "full" back into the original path
+                    let rest = &path[path.find("/full/").unwrap() + "/full/".len()..];
+                    PathBuf::from(rest)
+                }
+                _ => return tauri::http::Response::builder()
+                    .status(404)
+                    .body(Vec::new())
+                    .unwrap(),
+            };
+
+            let bytes = std::fs::read(&file).unwrap_or_default();
+
+            tauri::http::Response::builder()
+                .status(200)
+                .header("Content-Type", "image/jpeg")
+                .body(bytes)
+                .unwrap()
+        }
+        )
         .setup(|app| {
             // set up add storage path
             let local_appdata_path = app.path().app_local_data_dir().unwrap();
@@ -54,6 +95,10 @@ pub fn run() {
                 text_model: Mutex::new(None),
                 tokenizer: Mutex::new(None),
             });
+
+            // // TODO: set up 
+            // let workspace_files = get_workspace_hashset();
+            // // app.manage(workspace_files)
 
             app.manage(state);
 

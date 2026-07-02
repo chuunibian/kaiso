@@ -125,10 +125,8 @@ pub fn create_albumn(
 }
 
 // // For a given albumn insert a singular row
-// pub fn insert_singular_image() {
-// }
-
-
+pub fn insert_singular_image() {
+}
 
 
 // Create sync functions for when user wants to detect changes in an albumn

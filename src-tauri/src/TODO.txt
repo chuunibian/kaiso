@@ -1,0 +1,59 @@
+1. Try to early refactor including specifically how mananging state maybe decouple configs stuff from the model stuff
+
+
+
+TODO FE: ====================================================================================
+
+() Make components in the Top Bar
+
+() Revamp and make better the grid component
+    > Currently lazy load issue when on second query and if not lazy loadded before it gets stuck
+
+() For each grid cell make the UI more compact and better
+    > Possible can try and copy what others are doing for it
+
+() Add the overview tab
+    > Use similar global store way
+
+() Add an image viewer screen for when user clicks on image to view
+
+
+() Add ways to select or ways to multi select images
+
+
+() Add frontend status page when loading album and mostly for creating album
+
+
+
+TODO BE: ====================================================================================
+
+() Add the json functionality for album descriptions and metadata
+
+() Register the full image load code for custom protocol
+
+() Finish the function to give front album list
+
+() Add Backend sync functionality for the albums to sync new images into the albums 
+
+() Figure out a robust system for app to emit status updates
+    > Importantly need to emit back when creating a new album preproc -> indexing numbered
+
+
+() Add precheck functions before app startup to check for errors for the data stores
+
+() Add image search based query
+
+
+
+FEATURES: ===============================================================================
+
+1. Find stuff via image search
+2. Introduce hybrid search
+3. Add normal text based search
+4. Add filename semantic search pipeline
+5. Machine learning or some what pipeline for removing invalid or irrelevant images
+
+
+TODO issues:
+1. path when read to sqlite when broken it seems remove certain whitespaces
+2. Handle errors better

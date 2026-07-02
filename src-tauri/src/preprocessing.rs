@@ -33,6 +33,7 @@ pub fn process_album_image_paths(albumn_path: &Path) -> Result<Vec<PathBuf>, Str
 pub fn preprocess_album(
     paths: Vec<PathBuf>,
     thumbnail_path: &PathBuf,
+    album_name: &String,
     autoinc_counter: &AtomicI64,
 ) -> Result<Vec<(Image, Array4<f32>)>, String> {
     let target_size = 224;
@@ -40,18 +41,18 @@ pub fn preprocess_album(
     let tensors: Vec<(Image, Array4<f32>)> = paths
         .par_iter()
         .map(|path| {
-            let temp_hash = hash_path_id(path.as_path().to_str().unwrap());
+            let image_id = autoinc_counter.fetch_add(1, Ordering::Relaxed) as u64;
 
             // let mut buffer = Cursor::new(Vec::new());
             // let mut encoder = JpegEncoder::new_with_quality(&mut buffer, 80);
 
-            let (temp_img, temp1) = load_image(path, autoinc_counter).unwrap();
+            let (temp_img, temp1) = load_image(path, image_id).unwrap();
             let mut temp2 = recolor_image(temp1); // mut for pass into resize as view?
             let temp_thumb_resize = resize_image_thumb(&mut temp2).unwrap(); // mut ref need to be passed in
             let temp3 = resize_image(temp2, target_size).unwrap(); // takes ownership
 
             // for thumbnail !!!
-            temp_thumbnail_save(&temp_thumb_resize, temp_hash, thumbnail_path)
+            temp_thumbnail_save(&temp_thumb_resize, image_id, thumbnail_path, album_name)
                 .expect("failed to save thumbnail.");
 
             let temp4 = preprocess_rgb_image_to_clip(temp3); // return a tensor
@@ -64,15 +65,19 @@ pub fn preprocess_album(
 }
 
 // This function also needs to get some sort of auto incrementing number unique to a workspace
-fn temp_thumbnail_save(img_view: &RgbImage, id: u64, thumbnail_path: &PathBuf) -> Result<()> {
+fn temp_thumbnail_save(img_view: &RgbImage, id: u64, thumbnail_path: &PathBuf, album_name: &String) -> Result<()> {
     let filename = format!("{}.jpg", id);
-    let full_path = thumbnail_path.join(filename);
+    let full_path = thumbnail_path.join(album_name).join(filename);
+
+    fs::create_dir_all(full_path.parent().unwrap())?; // TODO this needs to be fixed
 
     img_view.save(&full_path)?;
 
     Ok(())
 }
 
+
+// TODO this is no longer relevant however can keep it
 pub fn hash_path_id(path: &str) -> u64 {
     let seed = 420;
     let hash = XxHash64::oneshot(seed, path.as_bytes()); // need as bytes since &str is same bytes but typing says it is bytes that are text
@@ -152,7 +157,7 @@ fn orient(img: DynamicImage, orientation: u32) -> DynamicImage {
 }
 
 // Decode once, build the Image struct, orient, hand both downstream.
-fn load_image(path: &PathBuf, autoinc_counter: &AtomicI64) -> Result<(Image, DynamicImage)> {
+fn load_image(path: &PathBuf, image_id: u64) -> Result<(Image, DynamicImage)> {
     let decoded = ImageReader::open(&path)?
         .with_guessed_format()?
         .decode()
@@ -168,7 +173,7 @@ fn load_image(path: &PathBuf, autoinc_counter: &AtomicI64) -> Result<(Image, Dyn
         .unwrap_or_default();
 
     let image = Image {
-        id: autoinc_counter.fetch_add(1, Ordering::Relaxed) as u64, // auto inc counter fetch a unique number
+        id: image_id,
         meta,
         embedding: None,
         name,
