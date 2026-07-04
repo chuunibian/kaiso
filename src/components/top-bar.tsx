@@ -6,7 +6,7 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "./ui/input";
-import { useGridStore } from "@/lib/store";
+import { useGridStore, useConfigStore } from "@/lib/store";
 import type { ImageOrder } from "@/lib/types";
 
 import { 
@@ -24,8 +24,22 @@ import {
 // WorkspaceSlot Component (Compact trigger and metadata label)
 const WorkspaceSlot = () => {
   const setAlbumScreenOpen = useGridStore((s) => s.setAlbumScreenOpen);
+  const currentWorkspace = useConfigStore((s) => s.currentWorkspace);
+  const workspaces = useConfigStore((s) => s.workspaces);
+
+  // Find info about the currently loaded workspace
+  const workspaceInfo = workspaces.find((w) => w.name === currentWorkspace);
+
+  // Format sync date
+  const dateStr = workspaceInfo?.date
+    ? new Date(workspaceInfo.date.secs_since_epoch * 1000).toLocaleDateString()
+    : "Not loaded";
+
+  // Clean path representation
+  const pathStr = workspaceInfo?.path || "No path resolved";
+
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 max-w-sm">
       <Button
         variant="secondary"
         size="icon"
@@ -35,9 +49,13 @@ const WorkspaceSlot = () => {
       >
         <FolderKanban className="h-4 w-4 text-muted-foreground" />
       </Button>
-      <div className="flex flex-col text-[10px] leading-tight text-muted-foreground select-none">
-        <span className="font-semibold text-foreground truncate max-w-40">current: temp_test_album2</span>
-        <span>images: 342 | synced: 2026-07-01</span>
+      <div className="flex flex-col text-[10px] leading-tight text-muted-foreground select-none min-w-0 flex-1">
+        <span className="font-semibold text-foreground truncate max-w-48" title={currentWorkspace}>
+          current: {currentWorkspace}
+        </span>
+        <span className="truncate text-muted-foreground/80" title={`${pathStr} | synced: ${dateStr}`}>
+          path: {pathStr} | synced: {dateStr}
+        </span>
       </div>
     </div>
   );
@@ -138,6 +156,8 @@ const TopBar = () => {
   const [userQuery, setUserQuery] = useState<string>("");
 
   const testQuery = async () => {
+    const setIsSearching = useGridStore.getState().setIsSearching;
+    setIsSearching(true);
     try {
       const result = await invoke<ImageOrder[]>('process_query', {
         userQuery: userQuery
@@ -146,12 +166,14 @@ const TopBar = () => {
       useGridStore.getState().changeOrderedIds(result);
     } catch (e) {
       console.log(e);
+    } finally {
+      setIsSearching(false);
     }
   }
 
   return (
     <Card className="rounded-none border-x-0 border-t-0 shrink-0">
-      <CardContent className="flex flex-col gap-2 p-3">
+      <CardContent className="flex flex-col gap-1.5 pt-1.5 pb-2 px-3">
         {/* Row 1: Search bar and adjustments */}
         <div className="flex flex-row items-center justify-between gap-4 w-full">
           <SearchBar userQuery={userQuery} setUserQuery={setUserQuery} onSearch={testQuery} />

@@ -9,21 +9,40 @@ export function Titlebar() {
     return (
         <div
             data-tauri-drag-region
-            className="flex h-8 select-none items-center justify-between bg-background border-b border-border"
+            className="flex h-8 select-none items-center justify-between bg-background border-b border-border relative overflow-hidden"
         >
             <span
                 data-tauri-drag-region
-                className="px-3 text-xs font-medium text-muted-foreground"
+                className="px-3 text-xs font-semibold tracking-wider text-muted-foreground z-10"
             >
-                Prism
+                kaiso
             </span>
 
-            <div className="flex items-end gap-0.5 h-4">
-                <span className="w-0.5 bg-red-500 animate-[bar_0.8s_ease-in-out_infinite]" />
-                <span className="w-0.5 bg-red-500 animate-[bar_0.8s_ease-in-out_infinite_0.4s]" />
+            {/* Sleek Rotating Square Loading Animation */}
+            <div className="absolute left-16 top-0 bottom-0 flex items-center justify-center pointer-events-none z-0">
+                <div className="w-6 h-6 flex items-center justify-center relative">
+                    <style>{`
+                        @keyframes rotate-square {
+                            0% {
+                                transform: rotate(0deg);
+                            }
+                            100% {
+                                transform: rotate(90deg);
+                            }
+                        }
+                        .rotating-square {
+                            width: 8px;
+                            height: 8px;
+                            background-color: var(--primary);
+                            border-radius: 1px;
+                            animation: rotate-square 0.8s steps(2) infinite;
+                        }
+                    `}</style>
+                    <div className="rotating-square" />
+                </div>
             </div>
 
-            <div className="flex">
+            <div className="flex z-10">
                 <Button
                     variant="ghost"
                     size="icon"

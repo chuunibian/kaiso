@@ -1,59 +1,59 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useGridStore } from "@/lib/store";
+import { useGridStore, useConfigStore } from "@/lib/store";
 import { invoke } from "@tauri-apps/api/core";
-import { Calendar, Image, Search, ArrowRight } from "lucide-react";
+import { Calendar, Search, ArrowRight, Folder } from "lucide-react";
+import type { AlbumView, ImageOrder } from "@/lib/types";
 
-// TODO Revamp this template file 
-// This component is the list of albums
-
-interface MockAlbum {
-    name: string;
-    created: string;
-    imageCount: number;
-    description: string;
+// Drilled-down props from the parent AlbumScreen component
+interface AlbumListProps {
+    setCurrentWorkspace: (workspace: string) => void;
+    setAlbumScreenOpen: (open: boolean) => void;
 }
 
-const mockAlbums: MockAlbum[] = [
-    {
-        name: "vacation_2025",
-        created: "2025-06-15",
-        imageCount: 342,
-        description: "Photos from summer trip to Hawaii and Oahu beaches.",
-    },
-    {
-        name: "family_portraits",
-        created: "2025-12-24",
-        imageCount: 54,
-        description: "Christmas family gathering and portrait shoots.",
-    },
-    {
-        name: "street_photography",
-        created: "2026-03-10",
-        imageCount: 189,
-        description: "Black and white street snaps around Tokyo and Shibuya.",
-    },
-    {
-        name: "nature_walks",
-        created: "2026-05-01",
-        imageCount: 76,
-        description: "Macro photography of flora and fauna in local reserves.",
-    },
-];
-
-const AlbumList = () => {
-    const setAlbumScreenOpen = useGridStore((s) => s.setAlbumScreenOpen);
+const AlbumList: React.FC<AlbumListProps> = ({
+    setCurrentWorkspace,
+    setAlbumScreenOpen,
+}) => {
+    const workspaces = useConfigStore((s) => s.workspaces);
+    const setWorkspaces = useConfigStore((s) => s.setWorkspaces);
     const [searchQuery, setSearchQuery] = useState("");
     const [isLoading, setIsLoading] = useState<string | null>(null);
+    const clearCache = useGridStore((s) => s.resetCache);
+
+    // Fetch workspaces inside the actual album-list component on startup (mount)
+    useEffect(() => {
+        const fetchWorkspaces = async () => {
+            try {
+                const data = await invoke<AlbumView[]>("find_workspaces");
+                setWorkspaces(data);
+            } catch (e) {
+                console.error("Failed to find workspaces:", e);
+            }
+        };
+        fetchWorkspaces();
+    }, [setWorkspaces]);
 
     const handleLoadAlbum = async (albumName: string) => {
         setIsLoading(albumName);
         try {
+            // 1. Invoke backend load_workspace
             await invoke<string>("load_workspace", {
                 albumName: albumName,
             });
-            console.log("Album Loaded:", albumName);
+
+            // const result = await invoke<ImageOrder[]>("get_image_ids");
+            console.log("Album Loaded");
+            clearCache(); // Temp maybe
+
+            const result = await invoke<ImageOrder[]>("get_default_ids");
+
+            // 3. Populate grid store cache
+            useGridStore.getState().changeOrderedIds(result);
+
+            // 4. Update parent states and close screen
+            setCurrentWorkspace(albumName);
             setAlbumScreenOpen(false);
         } catch (e) {
             console.error("Failed to load album:", e);
@@ -62,11 +62,16 @@ const AlbumList = () => {
         }
     };
 
-    const filteredAlbums = mockAlbums.filter((album) => {
+    const filteredAlbums = workspaces.filter((album) => {
         const query = searchQuery.toLowerCase();
+        const dateStr = album.date
+            ? new Date(album.date.secs_since_epoch * 1000).toLocaleDateString()
+            : "";
         return (
             album.name.toLowerCase().includes(query) ||
-            album.created.includes(query)
+            album.description.toLowerCase().includes(query) ||
+            album.path.toLowerCase().includes(query) ||
+            dateStr.includes(query)
         );
     });
 
@@ -78,62 +83,71 @@ const AlbumList = () => {
                 <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search albums by name or date..."
-                    className="pl-9 h-9"
+                    placeholder="Search albums by name, description, or date..."
+                    className="pl-9 h-9 text-xs"
                 />
             </div>
 
             {/* Album List Container */}
             <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                 {filteredAlbums.length > 0 ? (
-                    filteredAlbums.map((album) => (
-                        <div
-                            key={album.name}
-                            onClick={() => !isLoading && handleLoadAlbum(album.name)}
-                            className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:bg-accent/40 hover:border-accent-foreground/20 transition-all duration-200 cursor-pointer group"
-                        >
-                            <div className="space-y-1 flex-1 mr-4">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                                        {album.name}
-                                    </span>
-                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                        <Image className="h-3 w-3" />
-                                        <span>{album.imageCount} files</span>
+                    filteredAlbums.map((album) => {
+                        const dateStr = album.date
+                            ? new Date(album.date.secs_since_epoch * 1000).toLocaleDateString()
+                            : "Unknown date";
+                        return (
+                            <div
+                                key={album.name}
+                                onClick={() => !isLoading && handleLoadAlbum(album.name)}
+                                className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:bg-accent/40 hover:border-accent-foreground/20 transition-all duration-200 cursor-pointer group"
+                            >
+                                <div className="space-y-1 flex-1 mr-4 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate max-w-xs">
+                                            {album.name}
+                                        </span>
+                                    </div>
+
+                                    {album.description && (
+                                        <p className="text-xs text-muted-foreground line-clamp-1">
+                                            {album.description}
+                                        </p>
+                                    )}
+
+                                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground/80 flex-wrap">
+                                        <div className="flex items-center gap-1">
+                                            <Calendar className="h-3 w-3 shrink-0" />
+                                            <span>Created: {dateStr}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 truncate max-w-xs">
+                                            <Folder className="h-3 w-3 shrink-0" />
+                                            <span className="truncate text-muted-foreground/60" title={album.path}>{album.path}</span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <p className="text-xs text-muted-foreground line-clamp-1">
-                                    {album.description}
-                                </p>
-
-                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground/80">
-                                    <Calendar className="h-3 w-3" />
-                                    <span>Created: {album.created}</span>
-                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={isLoading !== null}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleLoadAlbum(album.name);
+                                    }}
+                                    className="h-8 gap-1 text-xs opacity-80 group-hover:opacity-100 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200 shrink-0"
+                                >
+                                    {isLoading === album.name ? (
+                                        "Loading..."
+                                    ) : (
+                                        <>
+                                            <span>Load</span>
+                                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary-foreground" />
+                                        </>
+                                    )}
+                                </Button>
                             </div>
-
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={isLoading !== null}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleLoadAlbum(album.name);
-                                }}
-                                className="h-8 gap-1 text-xs opacity-80 group-hover:opacity-100 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200"
-                            >
-                                {isLoading === album.name ? (
-                                    "Loading..."
-                                ) : (
-                                    <>
-                                        <span>Load</span>
-                                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary-foreground" />
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    ))
+                        );
+                    })
                 ) : (
                     <div className="text-center py-8 border border-dashed border-border rounded-lg bg-muted/10">
                         <p className="text-xs text-muted-foreground">No albums found matching "{searchQuery}"</p>

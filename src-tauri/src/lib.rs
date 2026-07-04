@@ -75,11 +75,11 @@ pub fn run() {
             
 
             // create json for description matching IF current one does not exist
-            let descriptions_json_path = local_appdata_path.join("descriptions.json");
+            let descriptions_json_path = local_db_storage_path.join("workspaces.json");
             match std::fs::File::create_new(&descriptions_json_path) {
                 Ok(mut f) => {
                     use std::io::Write;
-                    let _ = f.write_all(b"{}"); // start with empty JSON object
+                    let _ = f.write_all(b"[]"); // start with empty JSON list
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {} // do nothign on if alr there
                 Err(e) => return Err(e.into()),
@@ -113,7 +113,8 @@ pub fn run() {
             temp_command::process_query,
             temp_command::process_query_image,
             temp_command::lazy_load_data,
-            temp_command::lazy_load_data_single
+            temp_command::lazy_load_data_single,
+            temp_command::get_default_ids,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

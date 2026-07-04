@@ -1,124 +1,236 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X } from "lucide-react";
+import { X, Search, Plus, RotateCw } from "lucide-react";
 import CustomPath from "./folderclicker";
-import AlbumList from "./album-list";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import AlbumList2 from "./album-list2";
 import { useGridStore, useConfigStore } from "@/lib/store";
 import { invoke } from "@tauri-apps/api/core";
+import type { ImageOrder, AlbumView } from "@/lib/types";
 
 const AlbumScreen = () => {
   const setAlbumScreenOpen = useGridStore((s) => s.setAlbumScreenOpen);
   const setWorkspace = useConfigStore((s) => s.setCurrentWorkspace);
+  const setWorkspaces = useConfigStore((s) => s.setWorkspaces);
+  const clearCache = useGridStore((s) => s.resetCache);
+
+  const [view, setView] = useState<'list' | 'create'>('list');
   const [selectedPath, setSelectedPath] = useState<string>("");
   const [albumName, setAlbumName] = useState<string>("");
-  const [loadText, setLoadText] = useState<string>("");
+  const [albumDescription, setAlbumDescription] = useState<string>("");
 
-  // using this function to test an entrypoint call for the create workspace func
-  const testFunction = async () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Fetch workspaces
+  const fetchWorkspaces = async () => {
     try {
-      const result = await invoke<string>('create_workspace', {
-        target: selectedPath,
-        albumName: albumName || "temp_test_album2"
-      });
-      console.log("Result:", result);
+      const data = await invoke<AlbumView[]>("find_workspaces");
+      setWorkspaces(data);
     } catch (e) {
-      console.log(e);
+      console.error("Failed to find workspaces:", e);
     }
-  }
+  };
 
-  const testLoadAlbum = async () => {
+  useEffect(() => {
+    fetchWorkspaces();
+  }, []);
+
+  const handleCreateWorkspace = async () => {
+    if (!albumName.trim() || !selectedPath.trim()) return;
+    setActionLoading(albumName);
     try {
-      const result = await invoke<string>('load_workspace', {
-        albumName: loadText
+      await invoke<string>('create_workspace', {
+        target: selectedPath,
+        albumName: albumName,
+        albumDescription: albumDescription || "No description provided."
       });
-      console.log("Album Loaded");
-      setWorkspace(loadText);
+
+      console.log("Workspace Created");
+
+      // Load workspace, creating workspace alrady loads it
+      // await invoke<string>('load_workspace', {
+      //   albumName: albumName
+      // });
+      clearCache();
+
+      const result = await invoke<ImageOrder[]>("get_default_ids");
+
+      try {
+        useGridStore.getState().changeOrderedIds(result);
+      } catch (err) {
+        console.log("get_default_ids failed:", err);
+      }
+
+      setWorkspace(albumName);
+      await fetchWorkspaces();
       setAlbumScreenOpen(false); // Close overlay on success
     } catch (e) {
-      console.log(e);
+      console.error(e);
+      alert("Failed to create workspace: " + e);
+    } finally {
+      setActionLoading(null);
     }
+  };
+
+  const handleLoadWorkspace = async (workspaceName: string) => {
+    setActionLoading(workspaceName);
+    try {
+      await invoke<string>("load_workspace", {
+        albumName: workspaceName,
+      });
+
+      console.log("Workspace Loaded");
+      clearCache();
+
+      try {
+        const ids = await invoke<ImageOrder[]>("get_default_ids");
+        useGridStore.getState().changeOrderedIds(ids);
+      } catch (err) {
+        console.log("get_default_ids failed:", err);
+      }
+
+      setWorkspace(workspaceName);
+      setAlbumScreenOpen(false);
+    } catch (e) {
+      console.error("Failed to load workspace:", e);
+      alert("Failed to load workspace: " + e);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Render Create Workspace Form
+  if (view === 'create') {
+    return (
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md">
+        <Card className="w-full max-w-lg mx-4 p-6 shadow-2xl relative border bg-card">
+          <button
+            onClick={() => setAlbumScreenOpen(false)}
+            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer transition-colors z-20"
+            title="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <CardHeader className="p-0 mb-4">
+            <CardTitle className="text-xs font-semibold text-muted-foreground tracking-wide uppercase">
+              Create New Workspace
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent className="p-0 space-y-4">
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Workspace Name:</span>
+              <Input
+                value={albumName}
+                onChange={(e) => setAlbumName(e.target.value)}
+                placeholder="Enter workspace name..."
+                className="h-9 text-xs"
+                disabled={actionLoading !== null}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Description:</span>
+              <Input
+                value={albumDescription}
+                onChange={(e) => setAlbumDescription(e.target.value)}
+                placeholder="Enter workspace description..."
+                className="h-9 text-xs"
+                disabled={actionLoading !== null}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Select Folder:</span>
+              <CustomPath value={selectedPath} onChange={setSelectedPath} />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setView('list')} disabled={actionLoading !== null}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleCreateWorkspace} disabled={!albumName.trim() || !selectedPath.trim() || actionLoading !== null}>
+                {actionLoading !== null ? "Creating..." : "Create"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
+  // Render List view (Default)
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md">
-      <Card className="w-full max-w-lg mx-4 p-6 shadow-2xl relative border">
+      <Card className="w-full max-w-2xl mx-4 p-6 shadow-2xl relative border bg-card">
         {/* Exit Button */}
         <button
           onClick={() => setAlbumScreenOpen(false)}
-          className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+          className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer transition-colors z-20"
           title="Close"
         >
           <X className="h-5 w-5" />
         </button>
 
-        <CardHeader className="p-0 mb-4">
-          <CardTitle className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
-            Workspace Manager
-          </CardTitle>
-        </CardHeader>
+        {/* Title Bar with controls */}
+        <div className="flex items-center justify-between border-b pb-4 mb-4">
+          <div className="space-y-0.5">
+            <CardTitle className="text-lg font-bold text-foreground">
+              Workspaces
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Manage and switch your indexed folder workspaces.</p>
+          </div>
 
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 text-xs"
+              onClick={() => {
+                setAlbumName("");
+                setAlbumDescription("");
+                setSelectedPath("");
+                setView('create');
+              }}
+              disabled={actionLoading !== null}
+            >
+              <Plus className="h-4 w-4" /> Create
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 text-xs text-muted-foreground/60"
+              disabled
+              title="Sync (Coming soon)"
+            >
+              <RotateCw className="h-3.5 w-3.5" /> Sync
+            </Button>
+          </div>
+        </div>
+
+        {/* Search bar */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search workspaces by name, path or description..."
+            className="pl-9 h-9 text-xs"
+            disabled={actionLoading !== null}
+          />
+        </div>
+
+        {/* Workspace List Container */}
         <CardContent className="p-0">
-          <Tabs defaultValue="create" className="w-full">
-            <TabsList>
-              <TabsTrigger value="create">Create Album</TabsTrigger>
-              <TabsTrigger value="load">Load Album</TabsTrigger>
-              <TabsTrigger value="sync">Sync</TabsTrigger>
-            </TabsList>
-
-            {/* Create Album Tab */}
-            <TabsContent value="create" className="space-y-4 pt-2">
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">Album Name:</span>
-                <Input
-                  value={albumName}
-                  onChange={(e) => setAlbumName(e.target.value)}
-                  placeholder="Enter album name..."
-                />
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">Select Folder:</span>
-                <CustomPath value={selectedPath} onChange={setSelectedPath} />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" size="sm" onClick={() => setAlbumScreenOpen(false)}>
-                  Cancel
-                </Button>
-                <Button size="sm" onClick={testFunction}>
-                  Test
-                </Button>
-              </div>
-            </TabsContent>
-
-            {/* Load Album Tab */}
-            <TabsContent value="load" className="pt-2 min-h-32 flex flex-col justify-start space-y-4">
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">Enter Album Name to Load:</span>
-                <Input
-                  value={loadText}
-                  onChange={(e) => setLoadText(e.target.value)}
-                  placeholder="e.g. temp_test_album2"
-                />
-              </div>
-              <div className="flex justify-end pt-2">
-                <Button variant="secondary" onClick={testLoadAlbum} className="h-8 text-xs">
-                  Load Album
-                </Button>
-              </div>
-            </TabsContent>
-
-            {/* Sync Tab */}
-            <TabsContent value="sync" className="pt-2 min-h-32 flex items-center justify-center border border-dashed border-border rounded-lg bg-muted/30">
-              <div className="text-center p-4">
-                <p className="text-sm text-muted-foreground font-medium">Sync Settings</p>
-                <p className="text-xs text-muted-foreground/75 mt-1">This feature is a placeholder and will allow advanced workspace syncing in a future update.</p>
-              </div>
-            </TabsContent>
-          </Tabs>
+          <AlbumList2
+            searchQuery={searchQuery}
+            onLoadWorkspace={handleLoadWorkspace}
+            actionLoading={actionLoading}
+            setView={setView}
+          />
         </CardContent>
       </Card>
     </div>

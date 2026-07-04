@@ -25,6 +25,7 @@ export interface AlbumView {
   name: string;
   description: string;
   path: string;
+  date: SystemTime;
 }
 
 export interface ImageFrontendRepresentation {
@@ -41,6 +42,7 @@ export interface ImageFrontendRepresentation {
 export type OrderedRankItems = ImageOrder[];               // just an array of ranked items
 export type ImageViewCache = Map<number, ImageFrontendRepresentation>;  // just the id -> row map
 
+// Not currently used
 export interface FrontendCache {
   orderedIds: OrderedRankItems;
   cache: ImageViewCache;

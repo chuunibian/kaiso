@@ -10,12 +10,12 @@ function App() {
   // theme provider provides from the index.css
   return (
     <ThemeProvider defaultTheme="prismatic">
-      {/* <Titlebar /> */}
-      {/* <div className="relative w-full overflow-hidden" style={{ height: "calc(100vh - 32px)" }}> */}
-      <div className="relative w-full h-screen overflow-hidden">
-
-        <Dashboard />
-        {isAlbumScreenOpen && <AlbumScreen />}
+      <div className="flex flex-col w-screen h-screen overflow-hidden bg-background">
+        <Titlebar />
+        <div className="relative flex-1 min-h-0 w-full overflow-hidden">
+          <Dashboard />
+          {isAlbumScreenOpen && <AlbumScreen />}
+        </div>
       </div>
     </ThemeProvider>
   );

@@ -5,6 +5,7 @@ import type {
     ImageViewCache,
     ImageView,
     ImageFrontendRepresentation,
+    AlbumView,
 } from "./types";
 
 // TODO MAKE THIS A STATE!
@@ -24,25 +25,33 @@ interface FrontendGridStore {
     orderedIds: OrderedRankItems;
     cache: ImageViewCache;
     isAlbumScreenOpen: boolean;
+    isSearching: boolean;
     changeOrderedIds: (ranked: OrderedRankItems) => void;
+    resetCache: () => void;
     addToCache: (rows: ImageView[]) => void;
     setAlbumScreenOpen: (open: boolean) => void;
+    setIsSearching: (searching: boolean) => void;
 }
 
 interface FrontendConfigStore {
-    currentWorkspace: string,
+    currentWorkspace: string;
     setCurrentWorkspace: (workspace: string) => void;
+    workspaces: AlbumView[];
+    setWorkspaces: (workspaces: AlbumView[]) => void;
 }
 
 export const useConfigStore = create<FrontendConfigStore>((set) => ({
-    currentWorkspace: WORKSPACE, // currently the ddefault
+    currentWorkspace: WORKSPACE, // currently the default
     setCurrentWorkspace: (workspace: string) => set({ currentWorkspace: workspace }),
+    workspaces: [],
+    setWorkspaces: (workspaces) => set({ workspaces }),
 }));
 
 export const useGridStore = create<FrontendGridStore>((set) => ({
     orderedIds: [],
     cache: new Map(),
     isAlbumScreenOpen: false,
+    isSearching: false,
 
     // new query result — swap the ranking wholesale, leave cache untouched
     changeOrderedIds: (ranked) => set({ orderedIds: ranked }),
@@ -55,7 +64,9 @@ export const useGridStore = create<FrontendGridStore>((set) => ({
             for (const v of rows) next.set(v.id, toFrontend(v, workspace));
             return { cache: next };
         }),
+    resetCache: () => set({ cache: new Map() }), // when load new album/create new one (implicit load) then clear previous cache
     setAlbumScreenOpen: (open) => set({ isAlbumScreenOpen: open }),
+    setIsSearching: (searching) => set({ isSearching: searching }),
 }));
 
 interface ScrollRange {

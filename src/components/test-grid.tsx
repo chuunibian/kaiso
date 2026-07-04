@@ -220,7 +220,7 @@ async function fetchBatch(ids: number[]): Promise<ImageView[]> {
     return invoke<ImageView[]>("lazy_load_data", { ids });
 }
 
-// ── the cell: subscribes to ITS id's cache slot, skeleton on miss ──
+// grid cell
 function ImageCell({ id, score }: { id: number, score: number }) {
     const row = useGridStore((s) => s.cache.get(id)); // re-renders only when THIS id lands
 
@@ -240,17 +240,17 @@ function ImageCell({ id, score }: { id: number, score: number }) {
         <Card className="h-48 overflow-hidden group hover:border-primary/50 hover:shadow-md transition-all duration-200 relative bg-card">
             {/* Image Container */}
             <div className="w-full h-36 bg-muted overflow-hidden relative">
-                <img 
-                    src={row.thumbLink} 
+                <img
+                    src={row.thumbLink}
                     alt={row.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
                 {/* Floating Confidence Score Badge */}
                 <div className="absolute top-1 right-1 bg-black/60 backdrop-blur-xs text-[9px] text-white px-1 py-0.5 rounded font-mono font-medium select-none">
                     {score.toFixed(4)}
                 </div>
             </div>
-            
+
             {/* Info Footer */}
             <div className="p-1.5 flex flex-col justify-center h-12">
                 <div className="text-[10px] font-semibold truncate text-foreground leading-tight" title={row.name}>

@@ -13,6 +13,37 @@ use crate::{
     temp_models::{AlbumView, BackendState, ImageOrder, ImageView},
 };
 
+// basically goes through the cache and returns default list of ids this is needed for general initial loading of img on FE
+#[tauri::command]
+pub async fn get_default_ids(state: tauri::State<'_, Arc<BackendState>>) -> Result<Vec<ImageOrder>, String> {
+    // let state = state.inner().clone();
+
+    // tokio::task::spawn_blocking(move || get_default_ids_inner(&state))
+    //     .await
+    //     .map_err(|e| e.to_string())?
+
+    let temp = get_default_ids_inner(state.inner()).map_err(|e| e.to_string())?;
+    Ok(temp)
+}
+
+pub fn get_default_ids_inner(state: &BackendState) -> Result<Vec<ImageOrder>, String>{
+    let cache_guard = state.workspace_cache.lock().map_err(|e| e.to_string())?;
+    let mut vec_views: Vec<ImageOrder> = Vec::new();
+
+    if let Some(current_album) = cache_guard.as_ref() {
+        if let Some(cache) = current_album.album.as_ref() {
+            for id in cache.keys() {
+                vec_views.push(ImageOrder {
+                    id: *id,
+                    confidence_score: 0.0, // 0 is default score 
+                });
+            }
+        }
+    }
+
+    Ok(vec_views)
+}
+
 // Sends a single row instance
 #[tauri::command]
 pub async fn lazy_load_data_single(
@@ -83,31 +114,20 @@ pub async fn lazy_load_data_inner(
     Ok(vec_views)
 }
 
-// Creates new workspace
-// #[tauri::command]
-// pub async fn create_workspace(
-//     target: &str,
-//     album_name: String,
-//     state: tauri::State<'_, Arc<BackendState>>,
-// ) -> Result<(), String> {
-//     let target_owned = target.to_string();
-//     let state = state.inner().clone();
 
-//     tokio::task::spawn_blocking(move || create_workspace_inner(&target_owned, album_name, &state))
-//         .await
-//         .map_err(|e| e.to_string())?
-// }
+// TODO in future send in a custom struct that encapsulates the root path name and desc
 
 #[tauri::command]
 pub async fn create_workspace(
     target: &str,
     album_name: String,
+    album_description: String,
     state: tauri::State<'_, Arc<BackendState>>,
 ) -> Result<String, String> {
     let target_owned = target.to_string();
     let state = state.inner().clone();
 
-    tokio::task::spawn_blocking(move || create_workspace_inner(&target_owned, album_name, &state))
+    tokio::task::spawn_blocking(move || create_workspace_inner(&target_owned, album_name, album_description, &state))
         .await
         .map_err(|e| e.to_string())?;
 
@@ -117,6 +137,7 @@ pub async fn create_workspace(
 fn create_workspace_inner(
     target: &str,
     album_name: String,
+    album_description: String,
     state: &BackendState,
 ) -> Result<(), String> {
     // 1.) Process image album and cache
@@ -162,7 +183,10 @@ fn create_workspace_inner(
 
     // call db functions for this create album
     // Reads from the BE cache
-    create_albumn(album_name, state)?;
+    create_albumn(album_name.clone(), state)?;
+
+    // create the album in the json file
+    add_album_to_json_file(album_name.clone(), album_description, std::time::SystemTime::now(), state)?;
 
     Ok(())
 }
@@ -179,8 +203,8 @@ pub async fn load_workspace(
     let state = state.inner().clone(); // Arc clone
 
     tokio::task::spawn_blocking(move || load_workspace_inner(album_name, &state))
-        .await
-        .map_err(|e| e.to_string())?
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // TODO this function needs to also maybe give a default list of ordered ids for when the user did not query but still want ot show images
@@ -320,6 +344,10 @@ fn find_workspaces_inner(state: &BackendState) -> Result<Vec<AlbumView>, String>
 // utility function
 fn load_workspace_json(path: &Path) -> Result<Vec<JsonAlbum>, String> {
     let contents = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let trimmed = contents.trim();
+    if trimmed == "{}" || trimmed == "[]" || trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
     let albums: Vec<JsonAlbum> = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
 
     Ok(albums)
@@ -367,6 +395,27 @@ pub fn add_album_description_inner(
     }
 
     write_workspace_json(&json_path, albums_temp)?; // rewrite changes change ownership
+
+    Ok(())
+}
+
+// TODO in future add the root path as arguement
+pub fn add_album_to_json_file(album_name: String, album_description: String, album_date: SystemTime, state: &BackendState) -> Result<(), String>{
+    let db_path = state
+        .local_db_storage_path
+        .as_ref()
+        .ok_or("DB storage path not set".to_string())?;
+
+    let json_path = db_path.join("workspaces.json");
+    let mut albums_temp: Vec<JsonAlbum> = load_workspace_json(&json_path)?;
+
+    albums_temp.push(JsonAlbum {
+        name: album_name,
+        description: album_description,
+        date: album_date,
+        root_path: "".to_string(),
+    });
+    write_workspace_json(&json_path, albums_temp)?;
 
     Ok(())
 }
