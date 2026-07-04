@@ -85,11 +85,14 @@ pub fn run() {
                 Err(e) => return Err(e.into()),
             }
 
+            let resource_path = app.path().resource_dir().unwrap();
+
             let state = Arc::new(BackendState {
                 current_workspace: Mutex::new(String::new()), // represents the current workspace name
                 local_appdata_path: Some(local_appdata_path.to_path_buf()),
                 local_thumbnail_storage_path: Some(local_thumbnail_storage_path),
                 local_db_storage_path: Some(local_db_storage_path),
+                resource_path: Some(resource_path),
                 workspace_cache: Mutex::new(None),
                 vision_model: Mutex::new(None),
                 text_model: Mutex::new(None),
