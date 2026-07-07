@@ -6,6 +6,7 @@ import type {
     ImageView,
     ImageFrontendRepresentation,
     AlbumView,
+    SelectedOverviewImage,
 } from "./types";
 
 // TODO MAKE THIS A STATE!
@@ -58,6 +59,11 @@ interface FrontendConfigStore {
     setWorkspaces: (workspaces: AlbumView[]) => void;
     isIndexing: boolean;
     setIsIndexing: (indexing: boolean) => void;
+    previewFlag: boolean;
+    setPreviewFlag: (previewFlag: boolean) => void;
+    currentPreviewPath: string; // TODO refactor later, we technically dont need to pass in path
+    // since the backend is also storing the path, 
+    setCurrentPreviewPath: (currentPreviewPath: string) => void;
 }
 
 export const useConfigStore = create<FrontendConfigStore>((set) => ({
@@ -67,6 +73,10 @@ export const useConfigStore = create<FrontendConfigStore>((set) => ({
     setWorkspaces: (workspaces) => set({ workspaces }),
     isIndexing: false,
     setIsIndexing: (indexing) => set({ isIndexing: indexing }),
+    previewFlag: false,
+    setPreviewFlag: (previewFlag: boolean) => set({ previewFlag: previewFlag }),
+    currentPreviewPath: "", // default is none
+    setCurrentPreviewPath: (currentPreviewPath: string) => set({ currentPreviewPath: currentPreviewPath }),
 }));
 
 export const useGridStore = create<FrontendGridStore>((set) => ({
@@ -105,7 +115,6 @@ interface BottomBarStore {
     setBottomStatus: (bottomStatus: boolean) => void;
 }
 
-
 export const useBottomBarStore = create<BottomBarStore>((set) => ({
     status: false,
     range: { startIndex: 0, endIndex: 0 },
@@ -113,4 +122,23 @@ export const useBottomBarStore = create<BottomBarStore>((set) => ({
     setStatus: (status: boolean) => set({ status: status }),
     setRange: (range: ScrollRange) => set({ range: range }),
     setBottomStatus: (bottomStatus: boolean) => set({ bottomStatus: bottomStatus }),
+}));
+
+interface OverviewPanelStore {
+    selectedImage: SelectedOverviewImage,
+    setSelectedImage: (selectedImage: SelectedOverviewImage) => void,
+}
+
+export const useOverviewPanelStore = create<OverviewPanelStore>((set) => ({
+    selectedImage: {
+        id: 0,
+        name: "",
+        path: "",
+        albumName: "",
+        size: 0,
+        dimension: { width: 0, height: 0 },
+        createdAt: { secs_since_epoch: 0, nanos_since_epoch: 0 },
+        modifiedAt: { secs_since_epoch: 0, nanos_since_epoch: 0 },
+    },
+    setSelectedImage: (selectedImage) => set({ selectedImage: selectedImage }),
 }));

@@ -53,3 +53,29 @@ export interface Progress {
   done: number;
   total: number;
 }
+
+export interface ImageDimensions {
+  width: number;
+  height: number;
+}
+
+/*
+  File name
+  Album
+  Path
+  size
+  Dim
+  created at 
+  mod at
+
+*/
+export interface SelectedOverviewImage {
+  id: number;
+  name: string;
+  path: string;
+  albumName: string;
+  size: number;
+  dimension: ImageDimensions;
+  createdAt: SystemTime;
+  modifiedAt: SystemTime;
+}

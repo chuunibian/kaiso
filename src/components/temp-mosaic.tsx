@@ -11,7 +11,6 @@ import {
     type LucideIcon,
 } from "lucide-react";
 
-
 // Fixed grid. The mosaic is a progress bar that happens to look like a
 // library — tiles are NOT mapped 1:1 to images (you'd get 3 tiles or 100k).
 const COLS = 20;
@@ -133,19 +132,6 @@ export function IndexingView() {
                     );
                 })}
             </div>
-
-            {/* bottom status strip */}
-            {/* <div className="flex items-center justify-between border-t border-neutral-900 px-5 py-3 tabular-nums">
-                <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#5ce0d8]" />
-                    <span className="text-[11px] text-neutral-400">{status}</span>
-                </div>
-                <span className="text-[11px] text-neutral-500">
-                    <span className="text-neutral-300">{indexed.toLocaleString()}</span>
-                    {" / "}
-                    {total.toLocaleString()}
-                </span>
-            </div> */}
         </div>
     );
 }

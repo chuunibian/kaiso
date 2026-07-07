@@ -30,6 +30,7 @@ pub fn run() {
 
             let state = ctx.app_handle().state::<Arc<BackendState>>();
 
+            // get the correct file resource file path
             let file = match parts.get(0) {
                 Some(&"thumb") => {
                     let (workspace, id) = match (parts.get(1), parts.get(2)) { // parse parts it is also possible weird stuff is passed in that might break it so
@@ -43,18 +44,22 @@ pub fn run() {
                     dir.join(workspace).join(format!("{id}.jpg"))
                 }
                 Some(&"full") => {
+                    // will be in the format of /full/{filepath given}
                     // rejoin everything after "full" back into the original path
-                    let rest = &path[path.find("/full/").unwrap() + "/full/".len()..];
-                    PathBuf::from(rest)
+                    // let rest = &path[path.find("/full/").unwrap() + "/full/".len()..];
+                    let temp = path.strip_prefix("/full/").unwrap_or(path);
+                    PathBuf::from(temp)
                 }
-                _ => return tauri::http::Response::builder()
+                trashed => return tauri::http::Response::builder()
                     .status(404)
                     .body(Vec::new())
                     .unwrap(),
             };
 
-            let bytes = std::fs::read(&file).unwrap_or_default();
+            // get resource file bytes
+            let bytes = std::fs::read(&file).unwrap_or_default(); // TODO Fix error handling
 
+            // return successful resp with image bytes and img header
             tauri::http::Response::builder()
                 .status(200)
                 .header("Content-Type", "image/jpeg")
