@@ -14,7 +14,8 @@
       {
         "title": "kaiso",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "decorations": false
       }
     ],
     "security": {
@@ -30,6 +31,11 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": {
+      "../model_exporter/clip_onnx_mobile/vision_model.onnx": "models/vision_model.onnx",
+      "../model_exporter/clip_onnx_mobile/text_model.onnx": "models/text_model.onnx",
+      "../model_exporter/clip_onnx_mobile/tokenizer.json": "models/tokenizer.json"
+    }
   }
 }
