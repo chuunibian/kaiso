@@ -47,3 +47,9 @@ export interface FrontendCache {
   orderedIds: OrderedRankItems;
   cache: ImageViewCache;
 }
+
+// used for create workspace progress update
+export interface Progress {
+  done: number;
+  total: number;
+}

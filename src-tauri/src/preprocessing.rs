@@ -50,6 +50,7 @@ pub fn preprocess_album(
             let mut temp2 = recolor_image(temp1); // mut for pass into resize as view?
             let temp_thumb_resize = resize_image_thumb(&mut temp2).unwrap(); // mut ref need to be passed in
             let temp3 = resize_image(temp2, target_size).unwrap(); // takes ownership
+            // let temp3 = resize_image(temp_thumb_resize.clone(), target_size).unwrap(); // diff ver
 
             // for thumbnail !!!
             temp_thumbnail_save(&temp_thumb_resize, image_id, thumbnail_path, album_name)
@@ -64,12 +65,17 @@ pub fn preprocess_album(
     Ok(tensors)
 }
 
+// wil create the thumbnail dir on request of the album creation
+pub fn create_thumbnail_dir(thumbnail_path: &PathBuf, album_name: &String) -> Result<(), String> {
+    let full_path = thumbnail_path.join(album_name);
+    fs::create_dir_all(&full_path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 // This function also needs to get some sort of auto incrementing number unique to a workspace
 fn temp_thumbnail_save(img_view: &RgbImage, id: u64, thumbnail_path: &PathBuf, album_name: &String) -> Result<()> {
     let filename = format!("{}.jpg", id);
     let full_path = thumbnail_path.join(album_name).join(filename);
-
-    fs::create_dir_all(full_path.parent().unwrap())?; // TODO this needs to be fixed
 
     img_view.save(&full_path)?;
 
@@ -116,6 +122,7 @@ pub fn find_image_paths(root: &Path) -> Vec<PathBuf> {
         })
         .collect()
 }
+
 
 fn get_exif_orientation(path: &Path) -> u32 {
     (|| -> Result<u32> {

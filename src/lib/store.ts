@@ -9,7 +9,7 @@ import type {
 } from "./types";
 
 // TODO MAKE THIS A STATE!
-const WORKSPACE = "temp_test_album2";
+const WORKSPACE = "N/A";
 
 // kaiso://localhost/{workspace}/{id} — matches your register_uri_scheme_protocol
 function thumbLink(id: number, workspace: string): string {
@@ -20,6 +20,24 @@ function thumbLink(id: number, workspace: string): string {
 function toFrontend(v: ImageView, workspace: string): ImageFrontendRepresentation {
     return { name: v.name, meta: v.meta, path: v.path, thumbLink: thumbLink(v.id, workspace) };
 }
+
+interface FrontendProgressStore {
+    textStatus: string;
+    setTextStatus: (textStatus: string) => void;
+    count: number;
+    setCount: (count: number) => void;
+    total: number;
+    setTotal: (total: number) => void;
+}
+
+export const useFrontendProgressStore = create<FrontendProgressStore>((set) => ({
+    textStatus: "Idle",
+    count: 0,
+    total: 0,
+    setTextStatus: (textStatus: string) => set({ textStatus: textStatus }),
+    setCount: (count: number) => set({ count: count }),
+    setTotal: (total: number) => set({ total: total }),
+}))
 
 interface FrontendGridStore {
     orderedIds: OrderedRankItems;
@@ -38,6 +56,8 @@ interface FrontendConfigStore {
     setCurrentWorkspace: (workspace: string) => void;
     workspaces: AlbumView[];
     setWorkspaces: (workspaces: AlbumView[]) => void;
+    isIndexing: boolean;
+    setIsIndexing: (indexing: boolean) => void;
 }
 
 export const useConfigStore = create<FrontendConfigStore>((set) => ({
@@ -45,6 +65,8 @@ export const useConfigStore = create<FrontendConfigStore>((set) => ({
     setCurrentWorkspace: (workspace: string) => set({ currentWorkspace: workspace }),
     workspaces: [],
     setWorkspaces: (workspaces) => set({ workspaces }),
+    isIndexing: false,
+    setIsIndexing: (indexing) => set({ isIndexing: indexing }),
 }));
 
 export const useGridStore = create<FrontendGridStore>((set) => ({

@@ -205,3 +205,9 @@ pub enum LogLevel {
     WARN,
     ERROR,
 }
+
+#[derive(Clone, serde::Serialize)]
+pub struct Progress {
+    pub done: usize,
+    pub total: usize,
+}

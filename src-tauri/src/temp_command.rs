@@ -5,11 +5,12 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicI64;
 use std::sync::Arc;
 use std::time::SystemTime;
+use tauri::{AppHandle, Emitter};
 
 use crate::{
     cosine_sim::compute_sim,
     db::{create_albumn, load_albumn},
-    preprocessing::{find_image_paths, merge_image_and_embeddings, preprocess_album},
+    preprocessing::{find_image_paths, merge_image_and_embeddings, preprocess_album, create_thumbnail_dir},
     temp_models::{AlbumView, BackendState, ImageOrder, ImageView},
 };
 
@@ -123,11 +124,13 @@ pub async fn create_workspace(
     album_name: String,
     album_description: String,
     state: tauri::State<'_, Arc<BackendState>>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     let target_owned = target.to_string();
     let state = state.inner().clone();
+    let app = app.clone();
 
-    tokio::task::spawn_blocking(move || create_workspace_inner(&target_owned, album_name, album_description, &state))
+    tokio::task::spawn_blocking(move || create_workspace_inner(&target_owned, album_name, album_description, &state, &app))
         .await
         .map_err(|e| e.to_string())?;
 
@@ -139,37 +142,35 @@ fn create_workspace_inner(
     album_name: String,
     album_description: String,
     state: &BackendState,
+    app: &AppHandle,
 ) -> Result<(), String> {
-    // 1.) Process image album and cache
-    // first preprocess
-    // Then embed
-    // Then store the cache
 
-    // 2.) Use cache to write to workspace
-    // take the cached rep from memory
-    // write to sqlite file
-
-    // All of this can be on the same blocking thread
-    // and the tauri command would just await it
-
-    // Also if want to emit messages like what stage it is at
-    // then apphandle is close send and sync so you can pass around like
-    // hot potato around threads of execution
     let path: &Path = Path::new(target);
     let thumbnail_path = state
         .local_thumbnail_storage_path
         .as_ref()
         .ok_or("Temp error".to_string())?;
+
+    emit_utility(app, "create-workspace", "Scanning for valid image paths...")?;
     let valid_image_paths: Vec<PathBuf> = find_image_paths(path);
     let id_counter = AtomicI64::new(0); // each workspace creation needs new auto inc id counter
 
+    emit_utility(app, "create-workspace", "Preprocessing images...")?;
+    let preproc_start = std::time::Instant::now();
+    create_thumbnail_dir(&thumbnail_path, &album_name)?; // create the thumbnail dir for new workspace
     let prepared = preprocess_album(valid_image_paths, thumbnail_path, &album_name, &id_counter)?;
+    let preproc_duration = preproc_start.elapsed();
+    println!("Preprocessing took: {:?}", preproc_duration);
     let (images, tensors) = prepared.into_iter().unzip();
 
     state.create_vision_model()?;
 
+    emit_utility(app, "create-workspace", "Embedding images...")?;
     let vm_guard = state.vision_model.lock().map_err(|e| e.to_string())?;
-    let embeddings: Vec<Vec<f32>> = vm_guard.as_ref().unwrap().embed_batch_list(tensors)?;
+    let inference_start = std::time::Instant::now();
+    let embeddings: Vec<Vec<f32>> = vm_guard.as_ref().unwrap().embed_batch_list_with_progress(tensors, app)?;
+    let inference_duration = inference_start.elapsed();
+    println!("Inference took: {:?}", inference_duration);
 
     // Drop lock release vm and then delete vm as not needed
     drop(vm_guard);
@@ -183,12 +184,22 @@ fn create_workspace_inner(
 
     // call db functions for this create album
     // Reads from the BE cache
+    emit_utility(app, "create-workspace", "Creating workspace in database...")?;
     create_albumn(album_name.clone(), state)?;
 
     // create the album in the json file
+    emit_utility(app, "create-workspace", "Finalizing workspace...")?;
     add_album_to_json_file(album_name.clone(), album_description, std::time::SystemTime::now(), state)?;
 
     Ok(())
+}
+
+pub fn emit_utility<T: Serialize + Clone>(
+    app: &AppHandle,
+    event_name: &str,
+    payload: T,
+) -> Result<(), String> {
+    app.emit(event_name, payload).map_err(|e| e.to_string())
 }
 
 // Should call with teh workspace name and then load from sqlite
@@ -242,6 +253,10 @@ fn delete_workspace_inner(album_name: &str, state: &BackendState) -> Result<(), 
     // TODO: also clean up thumbnails for this workspace later
     // clean_workspace_thumbnail
 
+    Ok(())
+}
+
+fn clean_up_workspace_thumbnails() -> Result<(), String> {
     Ok(())
 }
 

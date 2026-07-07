@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { X, Search, Plus, RotateCw } from "lucide-react";
 import CustomPath from "./folderclicker";
 import AlbumList2 from "./album-list2";
-import { useGridStore, useConfigStore } from "@/lib/store";
+import { useGridStore, useConfigStore, useFrontendProgressStore } from "@/lib/store";
 import { invoke } from "@tauri-apps/api/core";
-import type { ImageOrder, AlbumView } from "@/lib/types";
+import type { ImageOrder, AlbumView, Progress } from "@/lib/types";
+import { listen } from "@tauri-apps/api/event";
 
 const AlbumScreen = () => {
   const setAlbumScreenOpen = useGridStore((s) => s.setAlbumScreenOpen);
@@ -39,39 +40,57 @@ const AlbumScreen = () => {
 
   const handleCreateWorkspace = async () => {
     if (!albumName.trim() || !selectedPath.trim()) return;
-    setActionLoading(albumName);
-    try {
-      await invoke<string>('create_workspace', {
-        target: selectedPath,
-        albumName: albumName,
-        albumDescription: albumDescription || "No description provided."
+
+    const setIsIndexing = useConfigStore.getState().setIsIndexing;
+
+    // switch to the progress/indexing screen
+    setWorkspace(albumName);
+    setIsIndexing(true); // force loading screen 
+    setAlbumScreenOpen(false);
+
+    // set up listeners before invoking create_workspace, these listeners listen for msg from BE
+    // store to global store and force dynamic updates in the progress screen
+    const unlisten1 = await listen<string>("create-workspace", (event) => {
+      useFrontendProgressStore.getState().setTextStatus(event.payload);
+    });
+    const unlisten2 = await listen<Progress>("embed-progress", (event) => {
+      useFrontendProgressStore.getState().setCount(event.payload.done);
+      useFrontendProgressStore.getState().setTotal(event.payload.total);
+    });
+
+    // non-await but after promise returns set an async call back to do certain stuff
+    invoke<string>('create_workspace', {
+      target: selectedPath,
+      albumName: albumName,
+      albumDescription: albumDescription || "No description provided."
+    })
+      .then(async () => {
+        // Workspace created + already loaded on backend
+        clearCache();
+
+        try {
+          const result = await invoke<ImageOrder[]>("get_default_ids");
+          useGridStore.getState().changeOrderedIds(result);
+        } catch (err) {
+          console.log("get_default_ids failed:", err);
+        }
+
+        // Done indexing — switch from progress screen to grid
+        setIsIndexing(false);
+
+        // clean up listners after promise comes back
+        unlisten1();
+        unlisten2();
+      })
+      .catch((e) => {
+        console.error(e);
+        setIsIndexing(false);
+
+        alert("Failed to create workspace: " + e);
+
+        unlisten1();
+        unlisten2();
       });
-
-      console.log("Workspace Created");
-
-      // Load workspace, creating workspace alrady loads it
-      // await invoke<string>('load_workspace', {
-      //   albumName: albumName
-      // });
-      clearCache();
-
-      const result = await invoke<ImageOrder[]>("get_default_ids");
-
-      try {
-        useGridStore.getState().changeOrderedIds(result);
-      } catch (err) {
-        console.log("get_default_ids failed:", err);
-      }
-
-      setWorkspace(albumName);
-      await fetchWorkspaces();
-      setAlbumScreenOpen(false); // Close overlay on success
-    } catch (e) {
-      console.error(e);
-      alert("Failed to create workspace: " + e);
-    } finally {
-      setActionLoading(null);
-    }
   };
 
   const handleLoadWorkspace = async (workspaceName: string) => {
