@@ -212,20 +212,15 @@ import { VirtuosoGrid, VirtuosoProps, type ListRange } from "react-virtuoso";
 import { invoke } from "@tauri-apps/api/core";
 
 import { Skeleton } from "./ui/skeleton";
-import { useGridStore, useBottomBarStore, useConfigStore } from "../lib/store";
+import { useGridStore, useBottomBarStore, useConfigStore, useOverviewPanelStore } from "../lib/store";
 import type { ImageView } from "../lib/types";
+import { formatSize } from "../lib/utils";
 
 // one batched backend call for a window of ids
 async function fetchBatch(ids: number[]): Promise<ImageView[]> {
     return invoke<ImageView[]>("lazy_load_data", { ids });
 }
 
-// format bytes into a human-readable string like "2.1 MB"
-function formatSize(bytes: number): string {
-    if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
-    if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(1)} KB`;
-    return `${bytes} B`;
-}
 
 // truncate a filename in the middle: "Screenshot_20250101_abcdef.png" → "Scree…def.png"
 function truncateFilename(name: string, maxLen = 18): string {
@@ -244,11 +239,11 @@ function ImageCell({ id, score }: { id: number; score: number }) {
     const row = useGridStore((s) => s.cache.get(id));
     const setPreviewFlag = useConfigStore((s) => s.setPreviewFlag);
     const setCurrentPreviewPath = useConfigStore((s) => s.setCurrentPreviewPath);
-
+    const setCurrentSelectedImage = useOverviewPanelStore((s) => s.setSelectedImage);
 
     // for handling clicks
     const handleClick = (imgPath: string) => {
-
+        setCurrentSelectedImage({ id: 0, name: row.name, path: row.path, albumName: "", size: row.meta.size, dimension: { width: 0, height: 0 }, createdAt: { secs_since_epoch: 0, nanos_since_epoch: 0 }, modifiedAt: { secs_since_epoch: 0, nanos_since_epoch: 0 } })
     };
 
     const handleDoubleClick = (imgPath: string) => {
@@ -274,6 +269,7 @@ function ImageCell({ id, score }: { id: number; score: number }) {
             className="group h-[280px] flex flex-col items-center p-1 rounded-3xl cursor-default select-none
                        hover:bg-zinc-800/30 transition-colors duration-150"
             onDoubleClick={() => handleDoubleClick(row.path)}
+            onClick={() => handleClick(row.path)}
         >
             {/* Square thumbnail */}
             <div className="w-full flex-1 min-h-0 bg-zinc-900 rounded-3xl overflow-hidden border-2 border-transparent

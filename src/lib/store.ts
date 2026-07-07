@@ -45,11 +45,15 @@ interface FrontendGridStore {
     cache: ImageViewCache;
     isAlbumScreenOpen: boolean;
     isSearching: boolean;
+    // selectedSet: set<number>;
     changeOrderedIds: (ranked: OrderedRankItems) => void;
     resetCache: () => void;
     addToCache: (rows: ImageView[]) => void;
     setAlbumScreenOpen: (open: boolean) => void;
     setIsSearching: (searching: boolean) => void;
+    //addIdToSelected()
+    //removeIdFromSelected()
+    //clearSelected()
 }
 
 interface FrontendConfigStore {
@@ -93,7 +97,9 @@ export const useGridStore = create<FrontendGridStore>((set) => ({
         set((state) => {
             const workspace = useConfigStore.getState().currentWorkspace;
             const next = new Map(state.cache); // TODO need to explain why of this??
-            for (const v of rows) next.set(v.id, toFrontend(v, workspace));
+            for (const v of rows) {
+                next.set(v.id, toFrontend(v, workspace));
+            };
             return { cache: next };
         }),
     resetCache: () => set({ cache: new Map() }), // when load new album/create new one (implicit load) then clear previous cache
@@ -142,3 +148,4 @@ export const useOverviewPanelStore = create<OverviewPanelStore>((set) => ({
     },
     setSelectedImage: (selectedImage) => set({ selectedImage: selectedImage }),
 }));
+
