@@ -240,6 +240,13 @@ pub async fn delete_workspace(
 }
 
 fn delete_workspace_inner(album_name: &str, state: &BackendState) -> Result<(), String> {
+    clean_workspace_db_file(album_name, state);
+    clean_workspace_thumbnail(album_name, state);
+
+    Ok(())
+}
+
+fn clean_workspace_db_file(album_name: &str, state: &BackendState) -> Result<(), String> {
     let db_file = state
         .local_db_storage_path
         .as_ref()
@@ -250,13 +257,6 @@ fn delete_workspace_inner(album_name: &str, state: &BackendState) -> Result<(), 
         std::fs::remove_file(&db_file).map_err(|e| e.to_string())?;
     }
 
-    // TODO: also clean up thumbnails for this workspace later
-    // clean_workspace_thumbnail
-
-    Ok(())
-}
-
-fn clean_up_workspace_thumbnails() -> Result<(), String> {
     Ok(())
 }
 
@@ -266,7 +266,7 @@ fn clean_workspace_thumbnail(album_name: &str, state: &BackendState) -> Result<(
         .as_ref()
         .ok_or("Thumbnail storage path not set".to_string())?;
 
-    let thumbnail_folder = thumbnail_path.join(format!("{}.db", album_name));
+    let thumbnail_folder = thumbnail_path.join(format!("{}", album_name));
     if thumbnail_folder.exists() {
         std::fs::remove_dir_all(&thumbnail_folder).map_err(|e| e.to_string())?;
     }
@@ -376,6 +376,7 @@ fn write_workspace_json(path: &Path, albums: Vec<JsonAlbum>) -> Result<(), Strin
     Ok(())
 }
 
+// add or edit
 #[tauri::command]
 pub async fn add_album_description(
     album_name: String,
