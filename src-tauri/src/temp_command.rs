@@ -228,6 +228,25 @@ fn load_workspace_inner(album_name: String, state: &BackendState) -> Result<(), 
     Ok(())
 }
 
+
+// For sync workspace with selected folders
+// #[tauri::command]
+// pub async fn sync_workspace(album_name: String, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
+//     let state = state.inner().clone();
+//     tokio::task::spawn_blocking(move || sync_workspace_inner(album_name, &state))
+//         .await
+//         .map_err(|e| e.to_string())?
+// }
+
+// fn sync_workspace_inner(state: &BackendState) -> Result<(), String> {
+
+    
+//     Ok(())
+// }
+
+// Later on need to add util functions that take in list of changed images / missing images (paths) and then resync them to do something 
+
+
 #[tauri::command]
 pub async fn delete_workspace(
     album_name: String,
@@ -376,6 +395,24 @@ fn write_workspace_json(path: &Path, albums: Vec<JsonAlbum>) -> Result<(), Strin
     Ok(())
 }
 
+// basically will change album name in db file, thumbnail file, 
+// #[tauri::command]
+// pub async fn change_album_name() -> Result<(), String> {
+
+// }
+
+// fn change_album_name_inner() -> Result<> {
+
+// }
+
+// fn change_db_file_name() -> Result<()> {
+    
+// }
+
+// fn change_thumbnail_folder_name() -> Result<()> {
+    
+// }
+
 // add or edit
 #[tauri::command]
 pub async fn add_album_description(
@@ -433,6 +470,11 @@ pub fn add_album_to_json_file(album_name: String, album_description: String, alb
     });
     write_workspace_json(&json_path, albums_temp)?;
 
+    Ok(())
+}
+
+pub fn edit_album_name_json_file(album_name: String, new_album_name: String, state: &BackendState) -> Result<(), String> {
+    
     Ok(())
 }
 
