@@ -311,8 +311,8 @@ export default function TestGrid() {
     const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     // scroll bar mod
-    const Scroller = forwardRef<HTMLDivElement, VirtuosoProps<any, any>['components']['Scroller']>(
-        (props, ref) => <div {...props} ref={ref} className="custom-scroll" />
+    const Scroller = forwardRef<HTMLDivElement, any>(
+        (props, ref) => <div {...props} ref={ref} className="scrollbar-thin" />
     )
 
     const onRangeChanged = (range: ListRange) => {
@@ -353,6 +353,7 @@ export default function TestGrid() {
                     listClassName="flex flex-wrap p-2"
                     itemClassName="w-1/8 p-1 box-border"
                     className="h-full w-full bg-zinc-950"
+                    components={{ Scroller }}
                 />
             </div>
         </div>

@@ -96,7 +96,7 @@ const ImgViewScreen = () => {
             {/* Close button */}
             <button
                 onClick={handleClose}
-                className="absolute top-2 right-2 z-10 p-1 rounded-sm text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="absolute top-2 right-2 z-10 p-1 rounded-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 aria-label="Close preview"
             >
                 <X className="h-4 w-4" />
