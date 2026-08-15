@@ -1,0 +1,134 @@
+BUGS
+====
+
+WILL CRASH / WON'T COMPILE
+---------------------------
+
+1. checks.rs won't compile — all four functions have broken syntax. "-> {}" is
+   not a valid return type, and check_album_description_file is missing the "fn"
+   keyword and parentheses. This entire file is unparseable Rust.
+
+2. temp_utility.rs won't compile — check_thumbnail_space() declares
+   "-> Result<(), String>" but the body is empty (no expression returned),
+   which is a type mismatch. Needs at least Ok(()).
+
+3. db.rs will panic on missing state — load_albumn (line 15) and create_albumn
+   (lines 68, 80-83) use .unwrap() on Option values (local_db_storage_path,
+   workspace_cache, album). If any of these are None when called the app crashes.
+
+4. embedding_temp.rs will panic on bad image — embed_batch_list and
+   embed_batch_list_with_progress use .unwrap() inside the .map() iterator
+   (lines 148, 152-153 and 184, 188-189). One corrupt tensor crashes the entire
+   indexing run for the whole album.
+
+5. preprocessing.rs will panic on bad image — preprocess_album uses .unwrap()
+   inside par_iter().map() (lines 49, 51, 52) and .expect() (line 57). A single
+   undecodable image file panics the thread and kills the whole batch.
+
+
+DATA CORRUPTION / WRONG BEHAVIOR
+---------------------------------
+
+6. Content-Type always "image/jpeg" — lib.rs line 65 hardcodes
+   Content-Type: image/jpeg for every image served through the custom protocol,
+   including png, webp, gif, bmp, tiff, avif. Browsers may misrender or reject
+   non-jpeg images. (noted in your 7/12 errors)
+
+7. Paths with spaces get corrupted — paths containing spaces break when
+   round-tripping through sqlite, particularly screenshot paths. The stored path
+   no longer matches the real file path so images fail to load.
+   (noted in your 7/7 and 7/3 entries)
+
+8. Thumbnail cleanup path is wrong — clean_workspace_thumbnail (line 269) builds
+   the folder path as "{album_name}.db" but create_thumbnail_dir (line 70) creates
+   folders as just "{album_name}" without the .db suffix. Even if the cleanup
+   function were called, it would look in the wrong directory and never find
+   the thumbnails to delete.
+
+9. Thumbnail cleanup is never called — delete_workspace_inner deletes the .db
+   file but never calls clean_workspace_thumbnail(). Thumbnails accumulate on
+   disk forever after workspace deletion.
+
+10. root_path always saved as empty string — add_album_to_json_file (line 431)
+    hardcodes root_path: "".to_string(). The workspace list on the frontend
+    shows no folder path and the data is lost.
+
+11. Dates always show UNIX_EPOCH on loaded workspaces — the sqlite schema has no
+    date columns. The From<ImageDBRecord> impl (temp_models.rs lines 164, 166)
+    sets date_created and date_modified to SystemTime::UNIX_EPOCH. The overview
+    panel shows "—" for every loaded album's image dates.
+
+12. Image dimensions never stored — the overview panel shows 0x0 for every image
+    because dimensions are never extracted during preprocessing or stored in the
+    database/cache. SelectedOverviewImage.dimension is always {width:0, height:0}.
+
+13. Full image path broken on Windows — img-view-screen.tsx constructs the URL as
+    `http://kaiso.localhost/full/${currentPreviewPath}` which for a Windows path
+    like "C:\Users\photos\img.jpg" produces a malformed URL. The backend
+    strip_prefix("/full/") then creates a relative path missing the drive letter.
+    Paths with backslashes, spaces, or special chars will fail.
+
+14. avif files pass the walker but fail to decode — the directory walker allows
+    ".avif" but some avif files can't be decoded by the image crate, causing
+    panics in the preprocessing pipeline (see bug #5).
+    (noted in your 7/12 errors)
+
+
+FRONTEND BUGS
+-------------
+
+15. ImageCell click handler crashes on uncached images — handleClick (line 246)
+    accesses row.name, row.path, row.meta.size but the null guard (!row return
+    skeleton) is only for the render path. Click events can still fire on skeleton
+    cells during the brief window before the guard runs, causing a TypeError.
+
+16. Scroller component defined inside render body — the forwardRef Scroller
+    (test-grid.tsx line 314) is created inside the TestGrid function body. React
+    sees a new component type every render, unmounting and remounting the entire
+    scroll container. This kills scroll position and causes flicker.
+
+17. Lazy load gets stuck on second query — when orderedIds changes from a new
+    search but previously visible cells were never lazy-loaded, the range callback
+    doesn't re-fire for the already-visible window so those cells stay as
+    skeletons permanently. (noted in your FE TODO)
+
+18. Confidence score badge shows 0.0000 for all images on default load — when
+    loading a workspace without searching, get_default_ids sets every
+    confidence_score to 0.0, so every cell shows "0.0000" which is confusing.
+
+19. Bottom bar uses light-theme colors on dark app — bottom-md-bar.tsx uses
+    "bg-zinc-100 text-primary-foreground" which renders as a bright white bar
+    in the prismatic/dark theme. Visually jarring and unreadable in some themes.
+
+20. progress-panel.tsx listens to wrong event — it registers a listener for
+    "progress" but the backend emits "embed-progress". If this component were
+    ever mounted it would never receive data. (currently unused, replaced by
+    temp-mosaic.tsx, but still in the codebase)
+
+
+MINOR / COSMETIC BUGS
+----------------------
+
+21. index.html title says "Tauri + React + Typescript" — should be "Kaiso" or
+    the actual app name.
+
+22. WORKSPACE constant hardcoded to "N/A" — store.ts line 13 has a TODO comment
+    and the default shows "current: N/A" in the workspace slot on first load.
+
+23. console.log calls left in production code — test-grid.tsx line 336 logs
+    every fetched batch, top-bar.tsx line 165 logs every search result.
+    These spam the console and leak data.
+
+24. album-list.tsx is dead code — fully superseded by album-list2.tsx but still
+    in the repo. Contains its own stale handleLoadAlbum logic that could cause
+    confusion if accidentally imported.
+
+25. Custom protocol returns 200 with empty body on file read failure — lib.rs
+    line 60 uses unwrap_or_default() on fs::read, so if a file doesn't exist
+    the user gets a 200 OK with zero bytes instead of a proper 404.
+
+26. No CSP configured — tauri.conf.json sets "csp": null which completely
+    disables Content Security Policy.
+
+27. Tauri app icon is still the default — icons/ contains the stock Tauri icons
+    rather than a custom Kaiso app icon.

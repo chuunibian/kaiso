@@ -9,7 +9,7 @@ function App() {
 
   // theme provider provides from the index.css
   return (
-    <ThemeProvider defaultTheme="prismatic">
+    <ThemeProvider defaultTheme="dark">
       <div className="flex flex-col w-screen h-screen overflow-hidden bg-background">
         <Titlebar />
         <div className="relative flex-1 min-h-0 w-full overflow-hidden">

@@ -228,6 +228,25 @@ fn load_workspace_inner(album_name: String, state: &BackendState) -> Result<(), 
     Ok(())
 }
 
+
+// For sync workspace with selected folders
+// #[tauri::command]
+// pub async fn sync_workspace(album_name: String, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
+//     let state = state.inner().clone();
+//     tokio::task::spawn_blocking(move || sync_workspace_inner(album_name, &state))
+//         .await
+//         .map_err(|e| e.to_string())?
+// }
+
+// fn sync_workspace_inner(state: &BackendState) -> Result<(), String> {
+
+    
+//     Ok(())
+// }
+
+// Later on need to add util functions that take in list of changed images / missing images (paths) and then resync them to do something 
+
+
 #[tauri::command]
 pub async fn delete_workspace(
     album_name: String,
@@ -240,6 +259,13 @@ pub async fn delete_workspace(
 }
 
 fn delete_workspace_inner(album_name: &str, state: &BackendState) -> Result<(), String> {
+    clean_workspace_db_file(album_name, state);
+    clean_workspace_thumbnail(album_name, state);
+
+    Ok(())
+}
+
+fn clean_workspace_db_file(album_name: &str, state: &BackendState) -> Result<(), String> {
     let db_file = state
         .local_db_storage_path
         .as_ref()
@@ -250,13 +276,6 @@ fn delete_workspace_inner(album_name: &str, state: &BackendState) -> Result<(), 
         std::fs::remove_file(&db_file).map_err(|e| e.to_string())?;
     }
 
-    // TODO: also clean up thumbnails for this workspace later
-    // clean_workspace_thumbnail
-
-    Ok(())
-}
-
-fn clean_up_workspace_thumbnails() -> Result<(), String> {
     Ok(())
 }
 
@@ -266,7 +285,7 @@ fn clean_workspace_thumbnail(album_name: &str, state: &BackendState) -> Result<(
         .as_ref()
         .ok_or("Thumbnail storage path not set".to_string())?;
 
-    let thumbnail_folder = thumbnail_path.join(format!("{}.db", album_name));
+    let thumbnail_folder = thumbnail_path.join(format!("{}", album_name));
     if thumbnail_folder.exists() {
         std::fs::remove_dir_all(&thumbnail_folder).map_err(|e| e.to_string())?;
     }
@@ -376,6 +395,25 @@ fn write_workspace_json(path: &Path, albums: Vec<JsonAlbum>) -> Result<(), Strin
     Ok(())
 }
 
+// basically will change album name in db file, thumbnail file, 
+// #[tauri::command]
+// pub async fn change_album_name() -> Result<(), String> {
+
+// }
+
+// fn change_album_name_inner() -> Result<> {
+
+// }
+
+// fn change_db_file_name() -> Result<()> {
+    
+// }
+
+// fn change_thumbnail_folder_name() -> Result<()> {
+    
+// }
+
+// add or edit
 #[tauri::command]
 pub async fn add_album_description(
     album_name: String,
@@ -432,6 +470,11 @@ pub fn add_album_to_json_file(album_name: String, album_description: String, alb
     });
     write_workspace_json(&json_path, albums_temp)?;
 
+    Ok(())
+}
+
+pub fn edit_album_name_json_file(album_name: String, new_album_name: String, state: &BackendState) -> Result<(), String> {
+    
     Ok(())
 }
 

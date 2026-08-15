@@ -88,7 +88,9 @@ const AlbumList: React.FC<AlbumListProps> = ({
                 />
             </div>
 
-            {/* Album List Container */}
+            {/* Album List Container
+                map transform multi div like a list 
+            */}
             <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                 {filteredAlbums.length > 0 ? (
                     filteredAlbums.map((album) => {

@@ -173,7 +173,7 @@ const TopBar = () => {
 
   return (
     <Card className="rounded-none border-x-0 border-t-0 shrink-0">
-      <CardContent className="flex flex-col gap-1.5 pt-1.5 pb-2 px-3">
+      <CardContent className="flex flex-col gap-1.5 pt-1.5 pb-1 px-3">
         {/* Row 1: Search bar and adjustments */}
         <div className="flex flex-row items-center justify-between gap-4 w-full">
           <SearchBar userQuery={userQuery} setUserQuery={setUserQuery} onSearch={testQuery} />

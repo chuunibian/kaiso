@@ -1,0 +1,62 @@
+WHAT NEEDS TO BE DONE (ordered by importance)
+===============================================
+
+1. Fix the error handling across the backend — almost every function returns Result<_, String> instead of using the AppError type you already built in errors.rs, and db.rs has raw .unwrap() calls that will panic on any db/cache issue
+
+2. Fix the content-type bug in the custom protocol handler (lib.rs) — it hardcodes "image/jpeg" for every image format including png, webp, gif, avif, etc. Detect the actual extension and set the correct MIME type
+
+3. Fix the path encoding bug — paths with spaces get corrupted when round-tripping through sqlite (you noted this in 7/7 and 7/12), likely needs proper escaping or switching to storing raw bytes
+
+4. Fix dates — ImageDBRecord does not store created/modified timestamps so every loaded album shows UNIX_EPOCH. Add date columns to the sqlite schema and persist real dates
+
+5. Wire up the sort/filter/view controls in TopBar — the sort dropdown, sort-order toggle, grid/list toggle, and zoom slider are all rendered but do nothing. Connect them to state and make the grid respond
+
+6. Wire up delete_workspace to also delete thumbnails — clean_workspace_thumbnail() exists and works but delete_workspace_inner() never calls it, so thumbnails accumulate forever
+
+7. Store the actual root_path when creating a workspace — add_album_to_json_file always writes root_path as "" so the workspace list shows no folder path on the frontend
+
+8. Implement image selection and multi-select on the grid — the store already has commented-out selectedSet/addIdToSelected/removeIdFromSelected, needs actual click/shift-click/ctrl-click handling plus visual selection state on grid cells
+
+9. Build the album sync feature — detect when images have been added to or removed from the source folder and update the db + cache + thumbnails accordingly. The sync button in the workspace screen is already rendered but disabled
+
+10. Implement image-based similarity search (process_query_image) — the command is registered in lib.rs but the body is empty, needs to accept an image path, run it through the vision model, and do cosine sim against the cache
+
+11. Implement the precheck functions on startup (checks.rs) — verify appdata, thumbnail dir, db dir, and workspaces.json exist and are valid before the app tries to use them, and surface clear errors if not
+
+12. Implement the single image operations — rename_img, delete_img, delete_img_batch in img_commands.rs need actual logic to update the file system, db, cache, and thumbnails
+
+13. Implement insert_singular_image in db.rs — needed for the sync feature and for adding individual images to an existing workspace without full re-index
+
+14. Add chunked embedding for large albums — right now all images are held in one Vec through the entire preprocess + inference pipeline which will OOM on 50k+ folders. Break into configurable chunks (e.g. 5k) as you noted
+
+15. Improve the image viewer screen — currently it is barebones (just the image in a card with a close button), needs arrow key navigation between images, zoom/pan, and showing the filename and metadata
+
+16. Flesh out the overview panel — dimensions always show 0x0 because image dimensions are never extracted or stored, and dates show dashes because of the UNIX_EPOCH issue. Actually populate all the metadata fields
+
+17. Replace .unwrap() calls inside the embedding batch loops (embedding_temp.rs lines 148, 152-153, 184, 188-189) — a single corrupt image tensor will crash the entire indexing run instead of skipping that image
+
+18. Add keyboard shortcuts — Enter to search, Escape to close album screen (already works for image viewer), arrow keys to navigate selected image, Delete to remove selected
+
+19. Clean up dead code — album-list.tsx is fully superseded by album-list2.tsx but still in the repo, test-grid.tsx has ~200 lines of commented-out old implementations, progress-panel.tsx is unused and replaced by temp-mosaic.tsx, left-bar.tsx is commented out in dashboard.tsx
+
+20. Add a loading/progress indicator for workspace load — creating a workspace has the mosaic progress screen, but loading an existing workspace has no feedback at all (just a spinner text on the button)
+
+21. Replace the debug bottom bar with a real status bar — it currently shows raw boolean "status: true/false" and scroll range numbers which are dev debug values, not user-facing info. Show image count, current workspace, search status
+
+22. Add proper frontend error toasts/notifications — errors currently use console.error + browser alert() which looks broken in a desktop app. Use a toast notification system
+
+23. Add a theme switcher accessible to the user — the ThemeProvider supports dark, light, prismatic, and system themes but there is no UI to switch between them
+
+24. Implement text-based filename search — a lightweight search that just filters by filename without needing the CLIP model, useful for quick lookup
+
+25. Add workspace rename functionality — currently you can edit descriptions but not rename a workspace, which would require renaming the .db file, thumbnail folder, and json entry
+
+26. Migrate temp files into the module structure you scaffolded — embedding/, query/, core/, storage/, model/ directories are all empty and the real code lives in temp_command.rs, embedding_temp.rs, temp_models.rs. Move logic into the proper modules
+
+27. Add a custom app icon — tauri.conf.json still uses the default Tauri icons, and index.html title says "Tauri + React + Typescript"
+
+28. Add GPU/DirectML acceleration option for ONNX inference — currently CPU-only with 8 intra threads, a GPU execution provider would dramatically speed up embedding on machines with a dedicated GPU
+
+29. Introduce hybrid search — combine text-based CLIP search with filename search and/or future caption-based search for better recall
+
+30. Add auto-caption generation using BLIP — you have research notes on BLIP ITC/ITM/decoder, implementing even basic auto-captioning would enable text search over generated descriptions

@@ -183,63 +183,52 @@ const AlbumScreen = () => {
 
   // Render List view (Default)
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md">
-      <Card className="w-full max-w-2xl mx-4 p-6 shadow-2xl relative border bg-card">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <Card className="w-full max-w-3xl mx-4 p-8 shadow-2xl relative rounded-3xl border border-border bg-card overflow-hidden">
         {/* Exit Button */}
         <button
           onClick={() => setAlbumScreenOpen(false)}
-          className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer transition-colors z-20"
+          className="absolute right-6 top-6 text-muted-foreground hover:text-foreground cursor-pointer transition-colors z-20"
           title="Close"
         >
           <X className="h-5 w-5" />
         </button>
 
-        {/* Title Bar with controls */}
-        <div className="flex items-center justify-between border-b pb-4 mb-4">
-          <div className="space-y-0.5">
-            <CardTitle className="text-lg font-bold text-foreground">
-              Workspaces
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">Manage and switch your indexed folder workspaces.</p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1 text-xs"
-              onClick={() => {
-                setAlbumName("");
-                setAlbumDescription("");
-                setSelectedPath("");
-                setView('create');
-              }}
+        {/* Search bar + action buttons merged into one row */}
+        <div className="flex items-center gap-2 mb-6 pr-8">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search workspaces..."
+              className="pl-9 h-10 text-xs rounded-xl border-border bg-muted/30"
               disabled={actionLoading !== null}
-            >
-              <Plus className="h-4 w-4" /> Create
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1 text-xs text-muted-foreground/60"
-              disabled
-              title="Sync (Coming soon)"
-            >
-              <RotateCw className="h-3.5 w-3.5" /> Sync
-            </Button>
+            />
           </div>
-        </div>
-
-        {/* Search bar */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search workspaces by name, path or description..."
-            className="pl-9 h-9 text-xs"
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-10 gap-1.5 text-xs rounded-xl shrink-0 px-4"
+            onClick={() => {
+              setAlbumName("");
+              setAlbumDescription("");
+              setSelectedPath("");
+              setView('create');
+            }}
             disabled={actionLoading !== null}
-          />
+          >
+            <Plus className="h-4 w-4" /> Create
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-10 gap-1.5 text-xs rounded-xl shrink-0 px-4 text-muted-foreground/60"
+            disabled
+            title="Sync (Coming soon)"
+          >
+            <RotateCw className="h-3.5 w-3.5" /> Sync
+          </Button>
         </div>
 
         {/* Workspace List Container */}

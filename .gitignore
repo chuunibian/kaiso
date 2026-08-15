@@ -40,4 +40,6 @@ Desktop.ini
 *.db
 *.db-journal
 *.db-wal
+bugs.txt
+todosuggestions.txt
 
