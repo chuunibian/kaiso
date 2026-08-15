@@ -1,18 +1,24 @@
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useBottomBarStore } from "../lib/store";
 
 const BottomMdBar = () => {
+  const status = useBottomBarStore((s) => s.status);
+  const range = useBottomBarStore((s) => s.range);
+  const bottomStatus = useBottomBarStore((s) => s.bottomStatus);
+
   return (
-    <Card className="rounded-none border-x-0 border-b-0 shrink-0">
-      <CardHeader className="px-1">
-        <CardTitle className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
-          Bottom Bar
-        </CardTitle>
-      </CardHeader>
-    </Card>
+    <div className="bg-secondary border-t border-border text-secondary-foreground text-[10px] font-mono h-6 px-3 flex items-center justify-between select-none shrink-0 uppercase tracking-wider">
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1.5 font-bold">
+          <span className={`h-1.5 w-1.5 rounded-full ${status ? 'bg-green-400 animate-pulse' : 'bg-orange-400'}`} />
+          <span>status: {status ? "true" : "false"}</span>
+        </div>
+        <div className="w-px h-3 bg-border" />
+        <span className="font-semibold">range: {range.startIndex} - {range.endIndex}</span>
+      </div>
+      <div className="flex items-center gap-4">
+        <span className="font-semibold">bottomStatus: {bottomStatus ? "true" : "false"}</span>
+      </div>
+    </div>
   );
 };
 

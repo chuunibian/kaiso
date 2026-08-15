@@ -8,8 +8,8 @@ const Dashboard = () => {
   // includes the top bar and the wrapper for grid+overview
   // grid + overview is a flex row
   return (
-    <div className="flex flex-row h-screen w-screen overflow-hidden bg-background">
-      <LeftBar />
+    <div className="flex flex-row h-full w-full overflow-hidden bg-background">
+      {/* <LeftBar /> */}
       <SearchScreen />
     </div>
   );

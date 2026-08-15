@@ -19,6 +19,7 @@ pub struct BackendState {
     pub local_appdata_path: Option<PathBuf>, // root of appdata store
     pub local_thumbnail_storage_path: Option<PathBuf>,
     pub local_db_storage_path: Option<PathBuf>,
+    pub resource_path: Option<PathBuf>, // path to bundled resources dir (models, tokenizer)
 
     pub current_workspace: Mutex<String>, // user picked workspace set it so backend can know
 
@@ -46,10 +47,12 @@ impl BackendState {
     }
 
     pub fn create_tokenizer(&self) -> Result<(), String> {
+        let res = self.resource_path.as_ref().ok_or("Resource path not set".to_string())?;
+        let tok_path = res.join("models").join("tokenizer.json");
         let mut tok = self.tokenizer.lock().map_err(|e| e.to_string())?;
         if tok.is_none() {
             *tok = Some(
-                AppTokenizer::new("../model_exporter/clip_onnx_mobile/tokenizer.json").unwrap(),
+                AppTokenizer::new(tok_path.to_str().ok_or("Invalid tokenizer path")?).map_err(|e| e.to_string())?,
             );
         }
         Ok(())
@@ -62,21 +65,26 @@ impl BackendState {
     }
 
     pub fn create_vision_model(&self) -> Result<(), String> {
+        let res = self.resource_path.as_ref().ok_or("Resource path not set".to_string())?;
+        let model_path = res.join("models").join("vision_model.onnx");
         let mut vm = self.vision_model.lock().map_err(|e| e.to_string())?;
         if vm.is_none() {
             *vm = Some(
-                ClipVisionModel::new("../model_exporter/clip_onnx_mobile/vision_model.onnx")
-                    .unwrap(),
+                ClipVisionModel::new(model_path.to_str().ok_or("Invalid vision model path")?)
+                    .map_err(|e| e.to_string())?,
             );
         };
         Ok(())
     }
 
     pub fn create_text_model(&self) -> Result<(), String> {
+        let res = self.resource_path.as_ref().ok_or("Resource path not set".to_string())?;
+        let model_path = res.join("models").join("text_model.onnx");
         let mut tm = self.text_model.lock().map_err(|e| e.to_string())?;
         if tm.is_none() {
             *tm = Some(
-                ClipTextModel::new("../model_exporter/clip_onnx_mobile/text_model.onnx").unwrap(),
+                ClipTextModel::new(model_path.to_str().ok_or("Invalid text model path")?)
+                    .map_err(|e| e.to_string())?,
             );
         };
         Ok(())
@@ -171,8 +179,17 @@ pub struct AlbumView {
     pub name: String,
     pub description: String,
     pub path: PathBuf,
+    pub date: SystemTime,
 }
 
+// just for putting in and out of json file
+#[derive(Serialize, Deserialize)]
+pub struct JsonAlbum {
+    pub name: String,
+    pub description: String,
+    pub date: SystemTime,
+    pub root_path: String,
+}
 
 #[derive(Serialize, Clone)]
 struct LogEntry {
@@ -187,4 +204,10 @@ pub enum LogLevel {
     INFO,
     WARN,
     ERROR,
+}
+
+#[derive(Clone, serde::Serialize)]
+pub struct Progress {
+    pub done: usize,
+    pub total: usize,
 }
