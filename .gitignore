@@ -37,3 +37,6 @@ prototyping
 *.db-wal
 tempdb/
 temp_thumbnails/
+model_exporter/
+TODO.txt
+
