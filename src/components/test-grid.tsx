@@ -302,6 +302,12 @@ function ImageCell({ id, score }: { id: number; score: number }) {
     );
 }
 
+// Stable ref live outside of VirtusosGrid so it
+// doesn't remount the scroll container on every parent re-render.
+const Scroller = forwardRef<HTMLDivElement, any>(
+    (props, ref) => <div {...props} ref={ref} className="scrollbar-thin" />
+);
+
 export default function TestGrid() {
     const orderedIds = useGridStore((s) => s.orderedIds);
     const setRange = useBottomBarStore((s) => s.setRange);
@@ -309,11 +315,6 @@ export default function TestGrid() {
 
     // simple inline debounce so a fast scrub doesn't fire mid-flight
     const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-    // scroll bar mod
-    const Scroller = forwardRef<HTMLDivElement, any>(
-        (props, ref) => <div {...props} ref={ref} className="scrollbar-thin" />
-    )
 
     const onRangeChanged = (range: ListRange) => {
         clearTimeout(timer.current);

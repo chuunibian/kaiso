@@ -13,13 +13,22 @@ const SearchScreen = () => {
     return (
         <div className="flex flex-col w-full h-full overflow-hidden">
             <TopBar />
-            <div className="flex flex-row flex-1 min-h-0 w-full">
+            <div className="flex flex-row flex-1 min-h-0 w-full relative">
                 {isIndexing ? (
                     <IndexingView />
-                ) : previewFlag ? (
-                    <ImgViewScreen />
                 ) : (
-                    <TestGrid />
+                    <>
+                        {/* Always mounted so VirtuosoGrid keeps scroll position */}
+                        <div className="flex-1 min-w-0 h-full relative">
+                            <TestGrid />
+                            {/* Overlay only over the grid area when previewing */}
+                            {previewFlag && (
+                                <div className="absolute inset-0 z-10 flex bg-zinc-950">
+                                    <ImgViewScreen />
+                                </div>
+                            )}
+                        </div>
+                    </>
                 )}
                 <OverviewPanel />
             </div>
