@@ -15,7 +15,8 @@
         "title": "kaiso",
         "width": 800,
         "height": 600,
-        "decorations": false
+        "decorations": false,
+        "backgroundColor": "#18181b"
       }
     ],
     "security": {
