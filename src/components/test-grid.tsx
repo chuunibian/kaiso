@@ -31,15 +31,25 @@ function ImageCell({ id, score }: { id: number; score: number }) {
     const row = useGridStore((s) => s.cache.get(id));
     const setPreviewFlag = useConfigStore((s) => s.setPreviewFlag);
     const setCurrentPreviewPath = useConfigStore((s) => s.setCurrentPreviewPath);
+    const setCurrentPreviewId = useConfigStore((s) => s.setCurrentPreviewId);
     const setCurrentSelectedImage = useOverviewPanelStore((s) => s.setSelectedImage);
+    const isSelected = useSelectedEntitiesStore((s) => s.selectedSet.has(id));
+    const toggleSelected = useSelectedEntitiesStore((s) => s.toggleSelectedSet);
+    const multiSelectMode = useSelectedEntitiesStore((s) => s.multiSelectMode);
 
     // for handling clicks
     const handleClick = (imgPath: string) => {
-        setCurrentSelectedImage({ id: 0, name: row.name, path: row.path, albumName: "", size: row.meta.size, dimension: { width: 0, height: 0 }, createdAt: { secs_since_epoch: 0, nanos_since_epoch: 0 }, modifiedAt: { secs_since_epoch: 0, nanos_since_epoch: 0 } })
+        if (multiSelectMode) {
+            toggleSelected(id);
+        }
+        if (row) {
+            setCurrentSelectedImage({ id, name: row.name, path: row.path, albumName: "", size: row.meta.size, dimension: { width: 0, height: 0 }, createdAt: { secs_since_epoch: 0, nanos_since_epoch: 0 }, modifiedAt: { secs_since_epoch: 0, nanos_since_epoch: 0 } });
+        }
     };
 
     const handleDoubleClick = (imgPath: string) => {
         setCurrentPreviewPath(imgPath);
+        setCurrentPreviewId(id);
         setPreviewFlag(true);
     };
 
@@ -58,20 +68,26 @@ function ImageCell({ id, score }: { id: number; score: number }) {
 
     return (
         <div
-            className="group h-[280px] flex flex-col items-center p-1 rounded-3xl cursor-default select-none
-                       hover:bg-zinc-800/30 transition-colors duration-150"
+            className={`group h-[280px] flex flex-col items-center p-1 rounded-3xl cursor-default select-none
+                       transition-colors duration-150 ${isSelected ? 'bg-pink-500/10' : 'hover:bg-zinc-800/30'}`}
             onDoubleClick={() => handleDoubleClick(row.path)}
             onClick={() => handleClick(row.path)}
         >
             {/* Square thumbnail */}
-            <div className="w-full flex-1 min-h-0 bg-zinc-900 rounded-3xl overflow-hidden border-2 border-transparent
-                            group-hover:border-pink-400/70 transition-all duration-150 relative">
+            <div className={`w-full flex-1 min-h-0 bg-zinc-900 rounded-3xl overflow-hidden border-2 transition-all duration-150 relative
+                            ${isSelected ? 'border-pink-400' : 'border-transparent group-hover:border-pink-400/70'}`}>
                 <img
                     src={row.thumbLink}
                     alt={row.name}
                     loading="lazy"
                     className="w-full h-full object-cover"
                 />
+                {/* Selected check icon */}
+                {isSelected && (
+                    <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-pink-500 flex items-center justify-center shadow-lg shadow-pink-500/30">
+                        <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                    </div>
+                )}
                 {/* Confidence score badge */}
                 <div className="absolute top-0.5 right-0.5 bg-black/60 backdrop-blur-xs text-[11px] text-white/80 group-hover:text-pink-300 transition-colors duration-150 px-1 py-px rounded-sm font-mono leading-none select-none">
                     {score.toFixed(4)}
