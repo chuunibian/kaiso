@@ -68,9 +68,9 @@ const ImgViewScreen = () => {
                     path: cached.path,
                     albumName: "",
                     size: cached.meta.size,
-                    dimension: { width: 0, height: 0 },
-                    createdAt: { secs_since_epoch: 0, nanos_since_epoch: 0 },
-                    modifiedAt: { secs_since_epoch: 0, nanos_since_epoch: 0 },
+                    dimension: cached.meta.dimensions || { width: 0, height: 0 },
+                    createdAt: cached.meta.date_created,
+                    modifiedAt: cached.meta.date_modified,
                 });
             }
         },

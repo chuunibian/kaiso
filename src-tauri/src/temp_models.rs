@@ -122,10 +122,17 @@ pub struct Image {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ImageDimensions {
+    pub height: u32,
+    pub width: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageMetadata {
     pub date_created: SystemTime,
-    pub size: u64,
     pub date_modified: SystemTime,
+    pub size: u64,
+    pub dimensions: ImageDimensions,
 }
 
 // Specifically for Image stuf to send to FE when lazy loaded
@@ -162,8 +169,9 @@ impl From<ImageDBRecord> for Image {
             id: r.id,
             meta: ImageMetadata {
                 date_created: SystemTime::UNIX_EPOCH, // not stored yet
-                size: r.size,
                 date_modified: SystemTime::UNIX_EPOCH,
+                size: r.size,
+                dimensions: ImageDimensions { width: 0, height: 0 },
             },
             embedding: Some(r.embedding),
             name: r.name,
