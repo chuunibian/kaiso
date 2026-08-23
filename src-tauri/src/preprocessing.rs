@@ -119,7 +119,6 @@ pub fn find_image_paths(root: &Path) -> Vec<PathBuf> {
                     .as_deref(),
                 // Some("jpg" | "jpeg" | "png" | "gif" | "webp" | "bmp" | "tif" | "tiff" | "avif")
                 Some("jpg" | "jpeg" | "png" | "webp")
-
             )
         })
         .collect()

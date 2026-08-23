@@ -68,6 +68,8 @@ interface FrontendConfigStore {
     currentPreviewPath: string; // TODO refactor later, we technically dont need to pass in path
     // since the backend is also storing the path, 
     setCurrentPreviewPath: (currentPreviewPath: string) => void;
+    currentPreviewId: number | null;
+    setCurrentPreviewId: (id: number | null) => void;
 }
 
 export const useConfigStore = create<FrontendConfigStore>((set) => ({
@@ -81,6 +83,8 @@ export const useConfigStore = create<FrontendConfigStore>((set) => ({
     setPreviewFlag: (previewFlag: boolean) => set({ previewFlag: previewFlag }),
     currentPreviewPath: "", // default is none
     setCurrentPreviewPath: (currentPreviewPath: string) => set({ currentPreviewPath: currentPreviewPath }),
+    currentPreviewId: null,
+    setCurrentPreviewId: (id: number | null) => set({ currentPreviewId: id }),
 }));
 
 export const useGridStore = create<FrontendGridStore>((set) => ({
@@ -148,4 +152,113 @@ export const useOverviewPanelStore = create<OverviewPanelStore>((set) => ({
     },
     setSelectedImage: (selectedImage) => set({ selectedImage: selectedImage }),
 }));
+
+
+export enum FilterStatus {
+    Score = 'Score',
+    Date = 'Date',
+    Size = 'Size',
+    Name = 'Name',
+}
+
+export enum FilterStatusDirection {
+    Ascending = 'Ascending',
+    Descending = 'Descending',
+}
+
+export enum ViewStatus {
+    GridView = "Grid View",
+    ListView = "List View",
+}
+
+export enum AdvancedFilter {
+    Regex = 'Regex',
+}
+
+interface TopBarStateStore {
+    filterStatus: FilterStatus;
+    filterStatusDirection: FilterStatusDirection;
+    informationPanelFlag: boolean; // toggle visibility of the info panel
+    gridSize: number; // basically for the zoom in and out slider should be limited though
+    viewStatus: ViewStatus;
+
+    setGridSizeNumber: (gridSize: number) => void;
+    setFilterStatus: (filterStatus: FilterStatus) => void;
+    setInformationPanelFlag: (flag: boolean) => void;
+    setViewStatus: (viewStatus: ViewStatus) => void;
+    setFilterStatusDirection: (filterStatusDirection: FilterStatusDirection) => void;
+}
+
+
+export const useTopBarStateStore = create<TopBarStateStore>((set) => ({
+    filterStatus: FilterStatus.Score,
+    filterStatusDirection: FilterStatusDirection.Descending,
+    informationPanelFlag: false,
+    gridSize: 7, // default to 7
+    viewStatus: ViewStatus.GridView, // default to grid view
+
+    setGridSizeNumber: (gridSize: number) => {
+        if (gridSize > 0 && gridSize < 10) {
+            set({ gridSize: gridSize })
+        }
+    },
+    setFilterStatus: (filterStatus: FilterStatus) => set({ filterStatus: filterStatus }),
+    setInformationPanelFlag: (flag: boolean) => set({ informationPanelFlag: flag }),
+    setFilterStatusDirection: (filterStatusDirection: FilterStatusDirection) => set({ filterStatusDirection: filterStatusDirection }),
+    setViewStatus: (viewStatus: ViewStatus) => set({ viewStatus: viewStatus }),
+}));
+
+
+// topbarstate store will have a selected entities store later on
+interface selectedEntitiesStore {
+    selectedSet: Set<number>; // set of ids each of which denotes what cells/image is selected
+    multiSelectMode: boolean; // when true, clicking cells toggles selection
+    addSelectedSet: (id: number) => void;
+    addManySelectedSet: (ids: number[]) => void;
+    removeSelectedSet: (id: number) => void;
+    toggleSelectedSet: (id: number) => void;
+    clearSelectedSet: () => void;
+    setMultiSelectMode: (mode: boolean) => void;
+}
+
+
+// TODO review the imp logic of those and rewrite
+export const useSelectedEntitiesStore = create<selectedEntitiesStore>((set) => ({
+    selectedSet: new Set<number>(),
+    multiSelectMode: false,
+    addSelectedSet: (id: number) =>
+        set((state) => {
+            const next = new Set(state.selectedSet);
+            next.add(id);
+            return { selectedSet: next };
+        }),
+    addManySelectedSet: (ids: number[]) =>
+        set((state) => {
+            const next = new Set(state.selectedSet);
+            for (const id of ids) next.add(id);
+            return { selectedSet: next };
+        }),
+    removeSelectedSet: (id: number) =>
+        set((state) => {
+            const next = new Set(state.selectedSet);
+            next.delete(id);
+            return { selectedSet: next };
+        }),
+    toggleSelectedSet: (id: number) =>
+        set((state) => {
+            const next = new Set(state.selectedSet);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return { selectedSet: next };
+        }),
+    clearSelectedSet: () => set({ selectedSet: new Set<number>(), multiSelectMode: false }),
+    setMultiSelectMode: (mode: boolean) =>
+        set((state) => ({
+            multiSelectMode: mode,
+            // clear selection when exiting multi-select mode
+            selectedSet: mode ? state.selectedSet : new Set<number>(),
+        })),
+}));
+
+
 

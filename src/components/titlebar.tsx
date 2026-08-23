@@ -13,34 +13,37 @@ export function Titlebar() {
         >
             <span
                 data-tauri-drag-region
-                className="px-3 text-xs font-semibold tracking-wider text-muted-foreground z-10"
+                className="px-3 text-xs font-semibold tracking-wider z-10 kaiso-logo"
             >
+                <style>{`
+                    @keyframes kaiso-shimmer {
+                        0%, 100% {
+                            background-position: -100% center;
+                        }
+                        40%, 60% {
+                            background-position: 200% center;
+                        }
+                    }
+                    .kaiso-logo {
+                        background: linear-gradient(
+                            90deg,
+                            var(--muted-foreground) 0%,
+                            var(--muted-foreground) 35%,
+                            var(--foreground) 50%,
+                            var(--muted-foreground) 65%,
+                            var(--muted-foreground) 100%
+                        );
+                        background-size: 200% 100%;
+                        -webkit-background-clip: text;
+                        background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                        animation: kaiso-shimmer 3.5s ease-in-out infinite;
+                    }
+                `}</style>
                 kaiso
             </span>
 
-            {/* Sleek Rotating Square Loading Animation */}
-            <div className="absolute left-16 top-0 bottom-0 flex items-center justify-center pointer-events-none z-0">
-                <div className="w-6 h-6 flex items-center justify-center relative">
-                    <style>{`
-                        @keyframes rotate-square {
-                            0% {
-                                transform: rotate(0deg);
-                            }
-                            100% {
-                                transform: rotate(90deg);
-                            }
-                        }
-                        .rotating-square {
-                            width: 8px;
-                            height: 8px;
-                            background-color: var(--primary);
-                            border-radius: 1px;
-                            animation: rotate-square 0.8s steps(2) infinite;
-                        }
-                    `}</style>
-                    <div className="rotating-square" />
-                </div>
-            </div>
+
 
             <div className="flex z-10">
                 <Button

@@ -40,6 +40,10 @@ Desktop.ini
 *.db
 *.db-journal
 *.db-wal
+tempdb/
+temp_thumbnails/
+model_exporter/
+TODO.txt
 bugs.txt
 todosuggestions.txt
 

@@ -511,3 +511,15 @@ pub fn delete_album_description_inner(
 
     Ok(())
 }
+
+// TODO these functions drive actiosn that can be done for selected items
+// needs to do them based off the backend id actions
+// #[tauri::command]
+// pub async fn delete_id_action() -> Result<> {
+
+// }
+
+
+// pub async fn delete_id_action_batch() -> Result<> {
+
+// }
