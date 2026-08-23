@@ -120,6 +120,20 @@ export default function TestGrid() {
     const orderedIds = useGridStore((s) => s.orderedIds);
     const setRange = useBottomBarStore((s) => s.setRange);
     const setStatus = useBottomBarStore((s) => s.setStatus);
+    const gridSize = useTopBarStateStore((s) => s.gridSize);
+
+    // Static map so Tailwind sees each class at build time (dynamic interpolation gets purged)
+    const gridColClass: Record<number, string> = {
+        1: "w-1/1",
+        2: "w-1/2",
+        3: "w-1/3",
+        4: "w-1/4",
+        5: "w-1/5",
+        6: "w-1/6",
+        7: "w-1/7",
+        8: "w-1/8",
+        9: "w-1/9",
+    };
 
     // simple inline debounce so a fast scrub doesn't fire mid-flight
     const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -160,7 +174,7 @@ export default function TestGrid() {
                     isScrolling={(s) => setStatus(s)}
                     increaseViewportBy={400}
                     listClassName="flex flex-wrap p-2"
-                    itemClassName="w-1/8 p-1 box-border"
+                    itemClassName={`${gridColClass[gridSize] ?? "w-1/7"} p-1 box-border`}
                     className="h-full w-full bg-zinc-950"
                     components={{ Scroller }}
                 />
