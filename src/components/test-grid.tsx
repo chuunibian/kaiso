@@ -1,10 +1,12 @@
 // ImageGrid.tsx
-import { forwardRef, useRef } from "react";
+import { forwardRef, useEffect, useRef } from "react";
 import { VirtuosoGrid, VirtuosoProps, type ListRange } from "react-virtuoso";
 import { invoke } from "@tauri-apps/api/core";
+import { Check } from "lucide-react";
 
 import { Skeleton } from "./ui/skeleton";
-import { useGridStore, useBottomBarStore, useConfigStore, useOverviewPanelStore } from "../lib/store";
+import { virtuosoGridRef } from "../lib/grid-ref";
+import { useGridStore, useBottomBarStore, useConfigStore, useOverviewPanelStore, useTopBarStateStore, useSelectedEntitiesStore } from "../lib/store";
 import type { ImageView } from "../lib/types";
 import { formatSize } from "../lib/utils";
 
@@ -163,10 +165,33 @@ export default function TestGrid() {
         }, 120);
     };
 
+    // For when orderIds change force a same lazy load fetch logic for the current window or range 
+    // this prevents the issue of cells getting stuck on skeleton (and needing to force the rerender)
+    useEffect(() => {
+        if (orderedIds.length === 0) return;
+        const { cache } = useGridStore.getState();
+        const { range } = useBottomBarStore.getState();
+
+        const missing: number[] = [];
+        const rangeUpperBound = Math.min(range.endIndex, orderedIds.length - 1) // prevent oob if old range index > current ordered ids length
+        for (let i = range.startIndex; i <= rangeUpperBound; i++) {
+            const id = orderedIds[i]?.id;
+            if (id != null && !cache.has(id)) {
+                missing.push(id);
+            }
+        }
+        if (missing.length === 0) return;
+
+        fetchBatch(missing).then((fetchedData) => {
+            useGridStore.getState().addToCache(fetchedData);
+        });
+    }, [orderedIds]);
+
     return (
         <div className="h-full flex flex-col flex-1 min-w-0">
             <div className="w-full h-full flex-1 min-h-0">
                 <VirtuosoGrid
+                    ref={virtuosoGridRef}
                     style={{ height: "100%", width: "100%" }}
                     totalCount={orderedIds.length}
                     itemContent={(i) => <ImageCell id={orderedIds[i].id} score={orderedIds[i].confidence_score} />}
