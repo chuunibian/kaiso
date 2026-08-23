@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Instant, SystemTime};
 use twox_hash::XxHash64;
 
-use crate::temp_models::{Image, ImageMetadata};
+use crate::temp_models::{Image, ImageMetadata, ImageDimensions};
 
 const CLIP_SIZE: u32 = 224;
 const CLIP_MEAN: [f32; 3] = [0.48145466, 0.4578275, 0.40821073];
@@ -139,7 +139,7 @@ fn get_exif_orientation(path: &Path) -> u32 {
 }
 
 // Metadata comes from the filesystem, so this needs the path, not the decoded image.
-fn extract_image_metadata(path: &Path) -> Result<ImageMetadata> {
+fn extract_image_metadata(path: &Path, image: &DynamicImage) -> Result<ImageMetadata> {
     // !! In the future if add more metadata fields then just pass in &DynImage
     // and then get the extract metadata fields like dim and color and etc
 
@@ -148,6 +148,10 @@ fn extract_image_metadata(path: &Path) -> Result<ImageMetadata> {
         size: m.len(),
         date_created: m.created().unwrap_or(SystemTime::UNIX_EPOCH),
         date_modified: m.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+        dimensions: ImageDimensions {
+            width: image.width(),
+            height: image.height(),
+        }
     })
 }
 
@@ -171,7 +175,7 @@ fn load_image(path: &PathBuf, image_id: u64) -> Result<(Image, DynamicImage)> {
         .decode()
         .with_context(|| format!("decode failed: {}", path.display()))?;
 
-    let meta = extract_image_metadata(path)?;
+    let meta = extract_image_metadata(path, &decoded)?;
     let orientation = get_exif_orientation(path);
     let oriented = orient(decoded, orientation);
 

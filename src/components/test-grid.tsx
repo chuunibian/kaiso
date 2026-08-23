@@ -45,7 +45,16 @@ function ImageCell({ id, score }: { id: number; score: number }) {
             toggleSelected(id);
         }
         if (row) {
-            setCurrentSelectedImage({ id, name: row.name, path: row.path, albumName: "", size: row.meta.size, dimension: { width: 0, height: 0 }, createdAt: { secs_since_epoch: 0, nanos_since_epoch: 0 }, modifiedAt: { secs_since_epoch: 0, nanos_since_epoch: 0 } });
+            setCurrentSelectedImage({
+                id,
+                name: row.name,
+                path: row.path,
+                albumName: "",
+                size: row.meta.size,
+                dimension: row.meta.dimensions || { width: 0, height: 0 },
+                createdAt: row.meta.date_created,
+                modifiedAt: row.meta.date_modified,
+            });
         }
     };
 

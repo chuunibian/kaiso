@@ -7,6 +7,7 @@ export interface ImageMetadata {
   date_created: SystemTime;
   size: number;
   date_modified: SystemTime;
+  dimensions?: ImageDimensions;
 }
 
 export interface ImageView {
