@@ -160,7 +160,6 @@ fn create_workspace_inner(
     create_thumbnail_dir(&thumbnail_path, &album_name)?; // create the thumbnail dir for new workspace
     let prepared = preprocess_album(valid_image_paths, thumbnail_path, &album_name, &id_counter)?;
     let preproc_duration = preproc_start.elapsed();
-    println!("Preprocessing took: {:?}", preproc_duration);
     let (images, tensors) = prepared.into_iter().unzip();
 
     state.create_vision_model()?;
@@ -170,7 +169,6 @@ fn create_workspace_inner(
     let inference_start = std::time::Instant::now();
     let embeddings: Vec<Vec<f32>> = vm_guard.as_ref().unwrap().embed_batch_list_with_progress(tensors, app)?;
     let inference_duration = inference_start.elapsed();
-    println!("Inference took: {:?}", inference_duration);
 
     // Drop lock release vm and then delete vm as not needed
     drop(vm_guard);

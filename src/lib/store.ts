@@ -112,31 +112,37 @@ export const useGridStore = create<FrontendGridStore>((set) => ({
 }));
 
 interface ScrollRange {
-    startIndex: number,
-    endIndex: number,
+    startIndex: number;
+    endIndex: number;
 }
 
 interface BottomBarStore {
-    status: boolean,
-    range: ScrollRange,
-    bottomStatus: boolean,
+    status: boolean;
+    range: ScrollRange;
+    bottomStatus: boolean;
+    zoomLevel: number;
     setStatus: (status: boolean) => void;
     setRange: (range: ScrollRange) => void;
     setBottomStatus: (bottomStatus: boolean) => void;
+    setZoomLevel: (zoomLevel: number) => void;
 }
 
 export const useBottomBarStore = create<BottomBarStore>((set) => ({
     status: false,
     range: { startIndex: 0, endIndex: 0 },
     bottomStatus: false,
+    zoomLevel: 1,
     setStatus: (status: boolean) => set({ status: status }),
     setRange: (range: ScrollRange) => set({ range: range }),
     setBottomStatus: (bottomStatus: boolean) => set({ bottomStatus: bottomStatus }),
+    setZoomLevel: (zoomLevel: number) => set({ zoomLevel: zoomLevel }),
 }));
 
 interface OverviewPanelStore {
-    selectedImage: SelectedOverviewImage,
-    setSelectedImage: (selectedImage: SelectedOverviewImage) => void,
+    selectedImage: SelectedOverviewImage;
+    hoveredImage: SelectedOverviewImage | null;
+    setSelectedImage: (selectedImage: SelectedOverviewImage) => void;
+    setHoveredImage: (hoveredImage: SelectedOverviewImage | null) => void;
 }
 
 export const useOverviewPanelStore = create<OverviewPanelStore>((set) => ({
@@ -150,7 +156,9 @@ export const useOverviewPanelStore = create<OverviewPanelStore>((set) => ({
         createdAt: { secs_since_epoch: 0, nanos_since_epoch: 0 },
         modifiedAt: { secs_since_epoch: 0, nanos_since_epoch: 0 },
     },
+    hoveredImage: null,
     setSelectedImage: (selectedImage) => set({ selectedImage: selectedImage }),
+    setHoveredImage: (hoveredImage) => set({ hoveredImage: hoveredImage }),
 }));
 
 
@@ -259,6 +267,3 @@ export const useSelectedEntitiesStore = create<selectedEntitiesStore>((set) => (
             selectedSet: mode ? state.selectedSet : new Set<number>(),
         })),
 }));
-
-
-
