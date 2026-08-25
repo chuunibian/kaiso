@@ -123,6 +123,8 @@ pub fn run() {
             temp_command::lazy_load_data,
             temp_command::lazy_load_data_single,
             temp_command::get_default_ids,
+            temp_command::add_album_description,
+            temp_command::delete_album_description,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -187,7 +187,7 @@ fn create_workspace_inner(
 
     // create the album in the json file
     emit_utility(app, "create-workspace", "Finalizing workspace...")?;
-    add_album_to_json_file(album_name.clone(), album_description, std::time::SystemTime::now(), state)?;
+    add_album_to_json_file(album_name.clone(), album_description, target.to_string(), std::time::SystemTime::now(), state)?;
 
     Ok(())
 }
@@ -257,11 +257,34 @@ pub async fn delete_workspace(
 }
 
 fn delete_workspace_inner(album_name: &str, state: &BackendState) -> Result<(), String> {
-    clean_workspace_db_file(album_name, state);
-    clean_workspace_thumbnail(album_name, state);
+    clean_workspace_db_file(album_name, state)?;
+    clean_workspace_thumbnail(album_name, state)?;
+    remove_workspace_json(album_name, state)?;
 
     Ok(())
 }
+
+pub fn remove_workspace_json(album_name: &str, state: &BackendState) -> Result<(), String> {
+    let db_path = state
+        .local_db_storage_path
+        .as_ref()
+        .ok_or("DB storage path not set".to_string())?;
+
+    let json_path = db_path.join("workspaces.json");
+    let albums_temp: Vec<JsonAlbum> = load_workspace_json(&json_path)?;
+
+    let mut updated_albums: Vec<JsonAlbum> = Vec::new();
+    for album in albums_temp {
+        if album.name != album_name {
+            updated_albums.push(album);
+        }
+    }
+
+    write_workspace_json(&json_path, updated_albums)?;
+
+    Ok(())
+}
+
 
 fn clean_workspace_db_file(album_name: &str, state: &BackendState) -> Result<(), String> {
     let db_file = state
@@ -393,25 +416,7 @@ fn write_workspace_json(path: &Path, albums: Vec<JsonAlbum>) -> Result<(), Strin
     Ok(())
 }
 
-// basically will change album name in db file, thumbnail file, 
-// #[tauri::command]
-// pub async fn change_album_name() -> Result<(), String> {
-
-// }
-
-// fn change_album_name_inner() -> Result<> {
-
-// }
-
-// fn change_db_file_name() -> Result<()> {
-    
-// }
-
-// fn change_thumbnail_folder_name() -> Result<()> {
-    
-// }
-
-// add or edit
+// add or edit an albums description
 #[tauri::command]
 pub async fn add_album_description(
     album_name: String,
@@ -450,8 +455,9 @@ pub fn add_album_description_inner(
     Ok(())
 }
 
-// TODO in future add the root path as arguement
-pub fn add_album_to_json_file(album_name: String, album_description: String, album_date: SystemTime, state: &BackendState) -> Result<(), String>{
+// TODO in future always add as sorted insertion to keep it sorted via date or name or soemthign else
+// although not neeeded
+pub fn add_album_to_json_file(album_name: String, album_description: String, root_path: String, album_date: SystemTime, state: &BackendState) -> Result<(), String>{
     let db_path = state
         .local_db_storage_path
         .as_ref()
@@ -464,13 +470,15 @@ pub fn add_album_to_json_file(album_name: String, album_description: String, alb
         name: album_name,
         description: album_description,
         date: album_date,
-        root_path: "".to_string(),
+        root_path,
     });
     write_workspace_json(&json_path, albums_temp)?;
 
     Ok(())
 }
 
+// TODO
+// change the album name in the json file utility func
 pub fn edit_album_name_json_file(album_name: String, new_album_name: String, state: &BackendState) -> Result<(), String> {
     
     Ok(())
@@ -487,6 +495,7 @@ pub async fn delete_album_description(
         .map_err(|e| e.to_string())?
 }
 
+// deletes an album description only
 pub fn delete_album_description_inner(
     album_name: &str,
     state: &BackendState,
@@ -510,6 +519,27 @@ pub fn delete_album_description_inner(
     Ok(())
 }
 
+// basically will change album name in db file, thumbnail file, 
+// Add this in later !!
+
+// #[tauri::command]
+// pub async fn change_album_name() -> Result<(), String> {
+
+// }
+
+// fn change_album_name_inner() -> Result<> {
+
+// }
+
+// fn change_db_file_name() -> Result<()> {
+    
+// }
+
+// fn change_thumbnail_folder_name() -> Result<()> {
+    
+// }
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // TODO these functions drive actiosn that can be done for selected items
 // needs to do them based off the backend id actions
 // #[tauri::command]

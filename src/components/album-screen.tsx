@@ -75,6 +75,8 @@ const AlbumScreen = () => {
           console.log("get_default_ids failed:", err);
         }
 
+        fetchWorkspaces();
+
         // Done indexing — switch from progress screen to grid
         setIsIndexing(false);
 
