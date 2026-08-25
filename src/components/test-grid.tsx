@@ -35,6 +35,7 @@ function ImageCell({ id, score }: { id: number; score: number }) {
     const setCurrentPreviewPath = useConfigStore((s) => s.setCurrentPreviewPath);
     const setCurrentPreviewId = useConfigStore((s) => s.setCurrentPreviewId);
     const setCurrentSelectedImage = useOverviewPanelStore((s) => s.setSelectedImage);
+    const setHoveredImage = useOverviewPanelStore((s) => s.setHoveredImage);
     const isSelected = useSelectedEntitiesStore((s) => s.selectedSet.has(id));
     const toggleSelected = useSelectedEntitiesStore((s) => s.toggleSelectedSet);
     const multiSelectMode = useSelectedEntitiesStore((s) => s.multiSelectMode);
@@ -64,6 +65,25 @@ function ImageCell({ id, score }: { id: number; score: number }) {
         setPreviewFlag(true);
     };
 
+    const handleMouseEnter = () => {
+        if (row) {
+            setHoveredImage({
+                id,
+                name: row.name,
+                path: row.path,
+                albumName: "",
+                size: row.meta.size,
+                dimension: row.meta.dimensions || { width: 0, height: 0 },
+                createdAt: row.meta.date_created,
+                modifiedAt: row.meta.date_modified,
+            });
+        }
+    };
+
+    const handleMouseLeave = () => {
+        setHoveredImage(null);
+    };
+
     // skeleton placeholder while uncached
     if (!row) {
         return (
@@ -83,6 +103,8 @@ function ImageCell({ id, score }: { id: number; score: number }) {
                        transition-colors duration-150 ${isSelected ? 'bg-pink-500/10' : 'hover:bg-zinc-800/30'}`}
             onDoubleClick={() => handleDoubleClick(row.path)}
             onClick={() => handleClick(row.path)}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
         >
             {/* Square thumbnail */}
             <div className={`w-full flex-1 min-h-0 bg-zinc-900 rounded-3xl overflow-hidden border-2 transition-all duration-150 relative

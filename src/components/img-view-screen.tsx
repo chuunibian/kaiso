@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { useConfigStore, useGridStore, useOverviewPanelStore } from "@/lib/store";
+import { useConfigStore, useGridStore, useOverviewPanelStore, useBottomBarStore } from "@/lib/store";
 import type { ImageView } from "@/lib/types";
 
 const ImgViewScreen = () => {
@@ -11,6 +11,7 @@ const ImgViewScreen = () => {
     const setCurrentPreviewId = useConfigStore((s) => s.setCurrentPreviewId);
     const setPreviewFlag = useConfigStore((s) => s.setPreviewFlag);
     const setSelectedImage = useOverviewPanelStore((s) => s.setSelectedImage);
+    const setZoomLevel = useBottomBarStore((s) => s.setZoomLevel);
 
     const orderedIds = useGridStore((s) => s.orderedIds);
 
@@ -20,6 +21,17 @@ const ImgViewScreen = () => {
     const panStart = useRef({ x: 0, y: 0 });
     const translateStart = useRef({ x: 0, y: 0 });
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Sync zoom level to bottom bar store
+    useEffect(() => {
+        setZoomLevel(scale);
+    }, [scale, setZoomLevel]);
+
+    useEffect(() => {
+        return () => {
+            setZoomLevel(1);
+        };
+    }, [setZoomLevel]);
 
     // Find current index in orderedIds
     let currentIndex = -1;
