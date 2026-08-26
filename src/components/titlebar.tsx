@@ -2,10 +2,13 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minus, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfigStore } from "@/lib/store";
 
 const appWindow = getCurrentWindow();
 
 export function Titlebar() {
+    const isIndexing = useConfigStore((s) => s.isIndexing);
+
     return (
         <div
             data-tauri-drag-region
@@ -13,7 +16,9 @@ export function Titlebar() {
         >
             <span
                 data-tauri-drag-region
-                className="px-3 text-xs font-semibold tracking-wider z-10 kaiso-logo"
+                className={`px-3 text-xs font-semibold tracking-wider z-10 ${
+                    isIndexing ? "kaiso-logo" : "text-muted-foreground"
+                }`}
             >
                 <style>{`
                     @keyframes kaiso-shimmer {

@@ -113,6 +113,7 @@ function ImageCell({ id, score }: { id: number; score: number }) {
                     src={row.thumbLink}
                     alt={row.name}
                     loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover"
                 />
                 {/* Selected check icon */}
@@ -122,7 +123,7 @@ function ImageCell({ id, score }: { id: number; score: number }) {
                     </div>
                 )}
                 {/* Confidence score badge */}
-                <div className="absolute top-0.5 right-0.5 bg-black/60 backdrop-blur-xs text-[11px] text-white/80 group-hover:text-pink-300 transition-colors duration-150 px-1 py-px rounded-sm font-mono leading-none select-none">
+                <div className="absolute top-0.5 right-0.5 bg-black/75 text-[11px] text-white/80 group-hover:text-pink-300 transition-colors duration-150 px-1 py-px rounded-sm font-mono leading-none select-none">
                     {score.toFixed(4)}
                 </div>
             </div>
@@ -228,7 +229,7 @@ export default function TestGrid() {
                     itemContent={(i) => <ImageCell id={orderedIds[i].id} score={orderedIds[i].confidence_score} />}
                     rangeChanged={onRangeChanged}
                     isScrolling={(s) => setStatus(s)}
-                    increaseViewportBy={400}
+                    increaseViewportBy={200}
                     listClassName="flex flex-wrap p-2"
                     itemClassName={`${gridColClass[gridSize] ?? "w-1/7"} p-1 box-border`}
                     className="h-full w-full bg-zinc-950"
