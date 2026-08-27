@@ -224,7 +224,7 @@ fn resize_image_thumb(rgb: &mut RgbImage) -> Result<RgbImage> {
 
     let max_dim = std::cmp::max(w, h);
 
-    let target_ratio = 512.0 / max_dim as f64;
+    let target_ratio = 256.0 / max_dim as f64;
 
     let target_w = (w as f64 * target_ratio) as u32;
     let target_h = (h as f64 * target_ratio) as u32;
