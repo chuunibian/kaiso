@@ -137,6 +137,95 @@ pub async fn create_workspace(
     Ok("done".to_string())
 }
 
+
+// TODO for arguemtns re add stuff also recorrect logic, chunked_paths.map.collect might be better
+// for the vmguard I think it is better to lock in crete workspace and then unlock after chunked preprocis done
+// will return the mebddings ds
+fn chunked_preprocess_index_wrapper(chunked_paths: Vec<Vec<PathBuf>>, thumbnail_path: &PathBuf, album_name: &PathBuf) -> Result<Vec<Vec<f32>>, String> {
+
+    let embeddings: Vec<Vec<f32>> = Vec::new();
+    let chunk_counter = 0;
+    let number_of_chunks = chunked_paths.length();
+
+    for chunk in chunked_paths {
+        emit_utility(app, "create-workspace", format!("Preprocessing Chunk {chunk_counter}...", chunk_counter))
+        let prepared = preprocess_album(chunk, thumbnail_path, &album_name, &id_counter)?;
+        let (images, tensors) = prepared.into_iter().unzip();
+
+        emit_utility(app, "create-workspace", format!("Embedding Chunk {chunk_counter}..."))?;
+        // let vm_guard = state.vision_model.lock().map_err(|e| e.to_string())?;
+        let temp: Vec<Vec<f32>> = vm_guard.as_ref().unwrap().embed_batch_list_with_progress(tensors, app)?;
+
+        chunk_counter+=1;
+
+        embeddings.extend(temp);
+    }
+
+    Ok(embeddings)
+}
+
+// fn create_workspace_inner(
+//     target: &str,
+//     album_name: String,
+//     album_description: String,
+//     state: &BackendState,
+//     app: &AppHandle,
+// ) -> Result<(), String> {
+
+//     let path: &Path = Path::new(target);
+//     let thumbnail_path = state
+//         .local_thumbnail_storage_path
+//         .as_ref()
+//         .ok_or("Temp error".to_string())?;
+
+//     emit_utility(app, "create-workspace", "Scanning for valid image paths...")?;
+//     let valid_image_paths: Vec<PathBuf> = find_image_paths(path);
+//     let id_counter = AtomicI64::new(0); // each workspace creation needs new auto inc id counter
+
+//     // Since it is changing to chunked format, the naimation for the loading is sort of different
+//     // 
+//     // a way to have it could be many stages of the preprocessing and same animatons
+//     // just have it saywhich batchit is on and how many have been embedded ou tof the total 
+//     // or another way is to keep it at one mosiac but the mosaic must show the overall chunked progress so no that
+//     // useful since it will just increment in whatever the chunk size is
+
+//     state.create_vision_model()?; // vision model creation before chunk processing
+
+//     create_thumbnail_dir(&thumbnail_path, &album_name)?; // create the thumbnail dir for new workspace
+
+//     let vm_guard = state.vision_model.lock().map_err(|e| e.to_string())?;
+//     let chunked_paths: Vec<Vec<PathBuf>> = valid_path_chunking(valid_image_paths);
+//     // TODO FIX THIS
+//     // Takes in chunks of valid path for each one pass it to preproc
+//     // then pass that chunk to embed batch list with progress function
+//     // then gets back embeddings and aggregates or collects it into embedding full vec
+//     chunked_preprocess_indexing_wrapper(app, chunked_paths);
+
+//     let vm_guard = state.vision_model.lock().map_err(|e| e.to_string())?;
+//     let embeddings: Vec<Vec<f32>> = vm_guard.as_ref().unwrap().embed_batch_list_with_progress(tensors, app)?;
+
+//     // Drop lock release vm and then delete vm as not needed
+//     drop(vm_guard);
+//     state.delete_vision_model()?;
+
+//     // Merge uncomplete Image with embeddings to complete the list of Img
+//     let cache = merge_image_and_embeddings(images, embeddings).map_err(|e| e.to_string())?;
+
+//     // set the active cache to newly created map
+//     state.set_active_cache(cache)?;
+
+//     // call db functions for this create album
+//     // Reads from the BE cache
+//     emit_utility(app, "create-workspace", "Creating workspace in database...")?;
+//     create_albumn(album_name.clone(), state)?;
+
+//     // create the album in the json file
+//     emit_utility(app, "create-workspace", "Finalizing workspace...")?;
+//     add_album_to_json_file(album_name.clone(), album_description, target.to_string(), std::time::SystemTime::now(), state)?;
+
+//     Ok(())
+// }
+
 fn create_workspace_inner(
     target: &str,
     album_name: String,
@@ -155,20 +244,25 @@ fn create_workspace_inner(
     let valid_image_paths: Vec<PathBuf> = find_image_paths(path);
     let id_counter = AtomicI64::new(0); // each workspace creation needs new auto inc id counter
 
-    emit_utility(app, "create-workspace", "Preprocessing images...")?;
-    let preproc_start = std::time::Instant::now();
+    // Since it is changing to chunked format, the naimation for the loading is sort of different
+    // 
+    // a way to have it could be many stages of the preprocessing and same animatons
+    // just have it saywhich batchit is on and how many have been embedded ou tof the total 
+    // or another way is to keep it at one mosiac but the mosaic must show the overall chunked progress so no that
+    // useful since it will just increment in whatever the chunk size is
+
+    state.create_vision_model()?; // vision model creation before chunk processing
+
     create_thumbnail_dir(&thumbnail_path, &album_name)?; // create the thumbnail dir for new workspace
-    let prepared = preprocess_album(valid_image_paths, thumbnail_path, &album_name, &id_counter)?;
-    let preproc_duration = preproc_start.elapsed();
-    let (images, tensors) = prepared.into_iter().unzip();
 
-    state.create_vision_model()?;
-
-    emit_utility(app, "create-workspace", "Embedding images...")?;
     let vm_guard = state.vision_model.lock().map_err(|e| e.to_string())?;
-    let inference_start = std::time::Instant::now();
-    let embeddings: Vec<Vec<f32>> = vm_guard.as_ref().unwrap().embed_batch_list_with_progress(tensors, app)?;
-    let inference_duration = inference_start.elapsed();
+    let chunked_paths: Vec<Vec<PathBuf>> = valid_path_chunking(valid_image_paths);
+
+    // TODO FIX
+    // Takes in chunks of valid path for each one pass it to preproc
+    // then pass that chunk to embed batch list with progress function
+    // then gets back embeddings and aggregates or collects it into embedding full vec
+    let embeddings: Vec<Vec<f32>> = chunked_preprocess_indexing_wrapper(app, chunked_paths);
 
     // Drop lock release vm and then delete vm as not needed
     drop(vm_guard);

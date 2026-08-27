@@ -30,7 +30,45 @@ pub fn process_album_image_paths(albumn_path: &Path) -> Result<Vec<PathBuf>, Str
 
 // takes in albumn paths and then preprocesses into tensors
 // It is driving function and it has the par iter
+// pub fn preprocess_album(
+//     paths: Vec<PathBuf>,
+//     thumbnail_path: &PathBuf,
+//     album_name: &String,
+//     autoinc_counter: &AtomicI64,
+// ) -> Result<Vec<(Image, Array4<f32>)>, String> {
+//     let target_size = 224;
+
+//     let tensors: Vec<(Image, Array4<f32>)> = paths
+//         .par_iter()
+//         .map(|path| {
+//             let image_id = autoinc_counter.fetch_add(1, Ordering::Relaxed) as u64;
+
+//             // let mut buffer = Cursor::new(Vec::new());
+//             // let mut encoder = JpegEncoder::new_with_quality(&mut buffer, 80);
+
+//             let (temp_img, temp1) = load_image(path, image_id).unwrap();
+//             let mut temp2 = recolor_image(temp1); // mut for pass into resize as view?
+//             let temp_thumb_resize = resize_image_thumb(&mut temp2).unwrap(); // mut ref need to be passed in
+//             let temp3 = resize_image(temp2, target_size).unwrap(); // takes ownership
+//             // let temp3 = resize_image(temp_thumb_resize.clone(), target_size).unwrap(); // diff ver
+
+//             // for thumbnail !!!
+//             temp_thumbnail_save(&temp_thumb_resize, image_id, thumbnail_path, album_name)
+//                 .expect("failed to save thumbnail.");
+
+//             let temp4 = preprocess_rgb_image_to_clip(temp3); // return a tensor
+
+//             return (temp_img, temp4);
+//         })PFF
+//         .collect();
+
+//     Ok(tensors)
+// }
+
+// Now has become the generic entry point either chunked or not for a vec of paths to tensor
+// wraps around the parallized option or some other option like non parallized 
 pub fn preprocess_album(
+    app: &AppHandle,
     paths: Vec<PathBuf>,
     thumbnail_path: &PathBuf,
     album_name: &String,
@@ -38,13 +76,16 @@ pub fn preprocess_album(
 ) -> Result<Vec<(Image, Array4<f32>)>, String> {
     let target_size = 224;
 
-    let tensors: Vec<(Image, Array4<f32>)> = paths
-        .par_iter()
-        .map(|path| {
-            let image_id = autoinc_counter.fetch_add(1, Ordering::Relaxed) as u64;
+    Ok(parallized_preproc_to_tensor(paths, thumbnail_path, album_name, autoinc_counter, target_size))
+}
 
-            // let mut buffer = Cursor::new(Vec::new());
-            // let mut encoder = JpegEncoder::new_with_quality(&mut buffer, 80);
+// gets chunk of paths and returns tensors for that chunk
+// Doing this in chunk by chunk should be ok with the thumbnail and other stuff
+pub fn parallized_preproc_to_tensor(paths_chunk: Vec<PathBuf>, thumbnail_path: &PathBuf, album_name: &String, autoinc_counter: &AtomicI64, target_size: u64) -> Result<(Image, Array4<f32>), String> {
+
+    let tensors: Vec<(Image, Array4<f32>)> = paths_chunk.par_iter()
+    .map(|path| {
+            let image_id = autoinc_counter.fetch_add(1, Ordering::Relaxed) as u64;
 
             let (temp_img, temp1) = load_image(path, image_id).unwrap();
             let mut temp2 = recolor_image(temp1); // mut for pass into resize as view?
@@ -59,10 +100,21 @@ pub fn preprocess_album(
             let temp4 = preprocess_rgb_image_to_clip(temp3); // return a tensor
 
             return (temp_img, temp4);
-        })
-        .collect();
+        }
+    )
 
     Ok(tensors)
+}
+
+// Given all valid paths and returns a list of vec chuncked
+// Used at a higher level to split up the big paths that was originally passed into the original preprocess album
+pub fn valid_path_chunking(paths: Vec<PathBuf>) -> Result<Vec<Vec<PathBuf>>, String> {
+    let paths_len = paths.length();
+    let const CHUNK_C = 7500;
+    let number_of_chunks = paths_len / CHUNK_C;
+    let mut chunks: Vec<Vec<()>> = paths.chunks(CHUNK_C).map(|c| c.to_vec()).collect();
+
+    return chunks;
 }
 
 // wil create the thumbnail dir on request of the album creation
