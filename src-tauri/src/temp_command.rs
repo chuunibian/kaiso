@@ -1,3 +1,4 @@
+use crate::errors::AppError;
 use crate::temp_models::JsonAlbum;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -16,19 +17,13 @@ use crate::{
 
 // basically goes through the cache and returns default list of ids this is needed for general initial loading of img on FE
 #[tauri::command]
-pub async fn get_default_ids(state: tauri::State<'_, Arc<BackendState>>) -> Result<Vec<ImageOrder>, String> {
-    // let state = state.inner().clone();
-
-    // tokio::task::spawn_blocking(move || get_default_ids_inner(&state))
-    //     .await
-    //     .map_err(|e| e.to_string())?
-
-    let temp = get_default_ids_inner(state.inner()).map_err(|e| e.to_string())?;
+pub async fn get_default_ids(state: tauri::State<'_, Arc<BackendState>>) -> Result<Vec<ImageOrder>, AppError> {
+    let temp = get_default_ids_inner(state.inner())?;
     Ok(temp)
 }
 
-pub fn get_default_ids_inner(state: &BackendState) -> Result<Vec<ImageOrder>, String>{
-    let cache_guard = state.workspace_cache.lock().map_err(|e| e.to_string())?;
+pub fn get_default_ids_inner(state: &BackendState) -> Result<Vec<ImageOrder>, AppError>{
+    let cache_guard = state.workspace_cache.lock()?;
     let mut vec_views: Vec<ImageOrder> = Vec::new();
 
     if let Some(current_album) = cache_guard.as_ref() {
@@ -50,7 +45,7 @@ pub fn get_default_ids_inner(state: &BackendState) -> Result<Vec<ImageOrder>, St
 pub async fn lazy_load_data_single(
     id: u64,
     state: tauri::State<'_, Arc<BackendState>>,
-) -> Result<ImageView, String> {
+) -> Result<ImageView, AppError> {
     let temp = lazy_load_data_single_inner(id, &state).await?;
 
     Ok(temp)
@@ -59,15 +54,15 @@ pub async fn lazy_load_data_single(
 pub async fn lazy_load_data_single_inner(
     id: u64,
     state: &BackendState,
-) -> Result<ImageView, String> {
-    let cache_guard = state.workspace_cache.lock().map_err(|e| e.to_string())?;
+) -> Result<ImageView, AppError> {
+    let cache_guard = state.workspace_cache.lock()?;
 
-    let current_album = cache_guard.as_ref().ok_or("Err".to_string())?;
-    let cache = current_album.album.as_ref().ok_or("Err".to_string())?;
+    let current_album = cache_guard.as_ref().ok_or_else(|| AppError::CustomError("Err".to_string()))?;
+    let cache = current_album.album.as_ref().ok_or_else(|| AppError::CustomError("Err".to_string()))?;
 
     let temp_image = cache
         .get(&id)
-        .ok_or("Unable to find id in cache".to_string())?;
+        .ok_or_else(|| AppError::CustomError("Unable to find id in cache".to_string()))?;
     Ok(ImageView {
         id: temp_image.id,
         meta: temp_image.meta.clone(),
@@ -81,7 +76,7 @@ pub async fn lazy_load_data_single_inner(
 pub async fn lazy_load_data(
     ids: Vec<u64>,
     state: tauri::State<'_, Arc<BackendState>>,
-) -> Result<Vec<ImageView>, String> {
+) -> Result<Vec<ImageView>, AppError> {
     let temp = lazy_load_data_inner(ids, state.inner()).await?;
 
     Ok(temp)
@@ -92,9 +87,9 @@ pub async fn lazy_load_data(
 pub async fn lazy_load_data_inner(
     ids: Vec<u64>,
     state: &BackendState,
-) -> Result<Vec<ImageView>, String> {
+) -> Result<Vec<ImageView>, AppError> {
     // aquire lock and get the cache from BackendState
-    let cache_guard = state.workspace_cache.lock().map_err(|e| e.to_string())?;
+    let cache_guard = state.workspace_cache.lock()?;
     let mut vec_views: Vec<ImageView> = Vec::new();
 
     if let Some(current_album) = cache_guard.as_ref() {
@@ -125,14 +120,13 @@ pub async fn create_workspace(
     album_description: String,
     state: tauri::State<'_, Arc<BackendState>>,
     app: tauri::AppHandle,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let target_owned = target.to_string();
     let state = state.inner().clone();
     let app = app.clone();
 
     tokio::task::spawn_blocking(move || create_workspace_inner(&target_owned, album_name, album_description, &state, &app))
-        .await
-        .map_err(|e| e.to_string())?;
+        .await??;
 
     Ok("done".to_string())
 }
@@ -143,13 +137,13 @@ fn create_workspace_inner(
     album_description: String,
     state: &BackendState,
     app: &AppHandle,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
 
     let path: &Path = Path::new(target);
     let thumbnail_path = state
         .local_thumbnail_storage_path
         .as_ref()
-        .ok_or("Temp error".to_string())?;
+        .ok_or_else(|| AppError::CustomError("Temp error".to_string()))?;
 
     emit_utility(app, "create-workspace", "Scanning for valid image paths...")?;
     let valid_image_paths: Vec<PathBuf> = find_image_paths(path);
@@ -165,9 +159,9 @@ fn create_workspace_inner(
     state.create_vision_model()?;
 
     emit_utility(app, "create-workspace", "Embedding images...")?;
-    let vm_guard = state.vision_model.lock().map_err(|e| e.to_string())?;
+    let vm_guard = state.vision_model.lock()?;
     let inference_start = std::time::Instant::now();
-    let embeddings: Vec<Vec<f32>> = vm_guard.as_ref().unwrap().embed_batch_list_with_progress(tensors, app)?;
+    let embeddings: Vec<Vec<f32>> = vm_guard.as_ref().ok_or_else(|| AppError::CustomError("Vision model not loaded".to_string()))?.embed_batch_list_with_progress(tensors, app)?;
     let inference_duration = inference_start.elapsed();
 
     // Drop lock release vm and then delete vm as not needed
@@ -175,7 +169,7 @@ fn create_workspace_inner(
     state.delete_vision_model()?;
 
     // Merge uncomplete Image with embeddings to complete the list of Img
-    let cache = merge_image_and_embeddings(images, embeddings).map_err(|e| e.to_string())?;
+    let cache = merge_image_and_embeddings(images, embeddings)?;
 
     // set the active cache to newly created map
     state.set_active_cache(cache)?;
@@ -196,8 +190,9 @@ pub fn emit_utility<T: Serialize + Clone>(
     app: &AppHandle,
     event_name: &str,
     payload: T,
-) -> Result<(), String> {
-    app.emit(event_name, payload).map_err(|e| e.to_string())
+) -> Result<(), AppError> {
+    app.emit(event_name, payload)?;
+    Ok(())
 }
 
 // Should call with teh workspace name and then load from sqlite
@@ -205,19 +200,19 @@ pub fn emit_utility<T: Serialize + Clone>(
 pub async fn load_workspace(
     album_name: String,
     state: tauri::State<'_, Arc<BackendState>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     // similar process but would need to call a function to load from sqlite file
     // pass down the specific workspace to choose
     // that function will then load and cache from backend
     let state = state.inner().clone(); // Arc clone
 
     tokio::task::spawn_blocking(move || load_workspace_inner(album_name, &state))
-    .await
-    .map_err(|e| e.to_string())?
+    .await??;
+    Ok(())
 }
 
 // TODO this function needs to also maybe give a default list of ordered ids for when the user did not query but still want ot show images
-fn load_workspace_inner(album_name: String, state: &BackendState) -> Result<(), String> {
+fn load_workspace_inner(album_name: String, state: &BackendState) -> Result<(), AppError> {
     // Similar to create_workspace_inner
     // just load from sqlite to the cache and then ret ok when process is done
 
@@ -227,36 +222,18 @@ fn load_workspace_inner(album_name: String, state: &BackendState) -> Result<(), 
 }
 
 
-// For sync workspace with selected folders
-// #[tauri::command]
-// pub async fn sync_workspace(album_name: String, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
-//     let state = state.inner().clone();
-//     tokio::task::spawn_blocking(move || sync_workspace_inner(album_name, &state))
-//         .await
-//         .map_err(|e| e.to_string())?
-// }
-
-// fn sync_workspace_inner(state: &BackendState) -> Result<(), String> {
-
-    
-//     Ok(())
-// }
-
-// Later on need to add util functions that take in list of changed images / missing images (paths) and then resync them to do something 
-
-
 #[tauri::command]
 pub async fn delete_workspace(
     album_name: String,
     state: tauri::State<'_, Arc<BackendState>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let state = state.inner().clone();
     tokio::task::spawn_blocking(move || delete_workspace_inner(&album_name, &state))
-        .await
-        .map_err(|e| e.to_string())?
+        .await??;
+    Ok(())
 }
 
-fn delete_workspace_inner(album_name: &str, state: &BackendState) -> Result<(), String> {
+fn delete_workspace_inner(album_name: &str, state: &BackendState) -> Result<(), AppError> {
     clean_workspace_db_file(album_name, state)?;
     clean_workspace_thumbnail(album_name, state)?;
     remove_workspace_json(album_name, state)?;
@@ -264,11 +241,11 @@ fn delete_workspace_inner(album_name: &str, state: &BackendState) -> Result<(), 
     Ok(())
 }
 
-pub fn remove_workspace_json(album_name: &str, state: &BackendState) -> Result<(), String> {
+pub fn remove_workspace_json(album_name: &str, state: &BackendState) -> Result<(), AppError> {
     let db_path = state
         .local_db_storage_path
         .as_ref()
-        .ok_or("DB storage path not set".to_string())?;
+        .ok_or_else(|| AppError::CustomError("DB storage path not set".to_string()))?;
 
     let json_path = db_path.join("workspaces.json");
     let albums_temp: Vec<JsonAlbum> = load_workspace_json(&json_path)?;
@@ -286,29 +263,29 @@ pub fn remove_workspace_json(album_name: &str, state: &BackendState) -> Result<(
 }
 
 
-fn clean_workspace_db_file(album_name: &str, state: &BackendState) -> Result<(), String> {
+fn clean_workspace_db_file(album_name: &str, state: &BackendState) -> Result<(), AppError> {
     let db_file = state
         .local_db_storage_path
         .as_ref()
-        .ok_or("DB storage path not set".to_string())?
+        .ok_or_else(|| AppError::CustomError("DB storage path not set".to_string()))?
         .join(format!("{}.db", album_name));
 
     if db_file.exists() {
-        std::fs::remove_file(&db_file).map_err(|e| e.to_string())?;
+        std::fs::remove_file(&db_file)?;
     }
 
     Ok(())
 }
 
-fn clean_workspace_thumbnail(album_name: &str, state: &BackendState) -> Result<(), String> {
+fn clean_workspace_thumbnail(album_name: &str, state: &BackendState) -> Result<(), AppError> {
     let thumbnail_path = state
         .local_thumbnail_storage_path
         .as_ref()
-        .ok_or("Thumbnail storage path not set".to_string())?;
+        .ok_or_else(|| AppError::CustomError("Thumbnail storage path not set".to_string()))?;
 
     let thumbnail_folder = thumbnail_path.join(format!("{}", album_name));
     if thumbnail_folder.exists() {
-        std::fs::remove_dir_all(&thumbnail_folder).map_err(|e| e.to_string())?;
+        std::fs::remove_dir_all(&thumbnail_folder)?;
     }
 
     Ok(())
@@ -319,30 +296,29 @@ fn clean_workspace_thumbnail(album_name: &str, state: &BackendState) -> Result<(
 pub async fn process_query(
     user_query: String,
     state: tauri::State<'_, Arc<BackendState>>,
-) -> Result<Vec<ImageOrder>, String> {
+) -> Result<Vec<ImageOrder>, AppError> {
     let state = state.inner().clone();
 
     tokio::task::spawn_blocking(move || process_query_inner(user_query, &state))
-        .await
-        .map_err(|e| e.to_string())?
+        .await?
 }
 
 pub fn process_query_inner(
     user_query: String,
     state: &BackendState,
-) -> Result<Vec<ImageOrder>, String> {
+) -> Result<Vec<ImageOrder>, AppError> {
     state.create_text_model()?;
     state.create_tokenizer()?;
 
-    let tokenizer_guard = state.tokenizer.lock().map_err(|e| e.to_string())?;
+    let tokenizer_guard = state.tokenizer.lock()?;
     let tokenizer = tokenizer_guard
         .as_ref()
-        .ok_or("Tokenizer not initialized".to_string())?;
+        .ok_or_else(|| AppError::CustomError("Tokenizer not initialized".to_string()))?;
 
-    let tm_guard = state.text_model.lock().map_err(|e| e.to_string())?;
+    let tm_guard = state.text_model.lock()?;
     let tm = tm_guard
         .as_ref()
-        .ok_or("Text model not initialized".to_string())?;
+        .ok_or_else(|| AppError::CustomError("Text model not initialized".to_string()))?;
 
     let (user_embedding_tokenized, mask) = tokenizer.tokenize_input(&user_query)?;
     let user_embedding = tm.embed_single(user_embedding_tokenized, mask)?;
@@ -354,7 +330,7 @@ pub fn process_query_inner(
 
 // For finding images similar to given image
 #[tauri::command]
-pub async fn process_query_image() -> Result<(), String> {
+pub async fn process_query_image() -> Result<(), AppError> {
     Ok(())
 }
 
@@ -363,18 +339,17 @@ pub async fn process_query_image() -> Result<(), String> {
 #[tauri::command]
 pub async fn find_workspaces(
     state: tauri::State<'_, Arc<BackendState>>,
-) -> Result<Vec<AlbumView>, String> {
+) -> Result<Vec<AlbumView>, AppError> {
     let state = state.inner().clone();
     tokio::task::spawn_blocking(move || find_workspaces_inner(&state))
-        .await
-        .map_err(|e| e.to_string())?
+        .await?
 }
 
-fn find_workspaces_inner(state: &BackendState) -> Result<Vec<AlbumView>, String> {
+fn find_workspaces_inner(state: &BackendState) -> Result<Vec<AlbumView>, AppError> {
     let db_path = state
         .local_db_storage_path
         .as_ref()
-        .ok_or("DB storage path not set".to_string())?;
+        .ok_or_else(|| AppError::CustomError("DB storage path not set".to_string()))?;
 
     let json_path = db_path.join("workspaces.json");
 
@@ -397,21 +372,21 @@ fn find_workspaces_inner(state: &BackendState) -> Result<Vec<AlbumView>, String>
 
 // This function will given the json path load it in and return it ready
 // utility function
-fn load_workspace_json(path: &Path) -> Result<Vec<JsonAlbum>, String> {
-    let contents = fs::read_to_string(path).map_err(|e| e.to_string())?;
+fn load_workspace_json(path: &Path) -> Result<Vec<JsonAlbum>, AppError> {
+    let contents = fs::read_to_string(path)?;
     let trimmed = contents.trim();
     if trimmed == "{}" || trimmed == "[]" || trimmed.is_empty() {
         return Ok(Vec::new());
     }
-    let albums: Vec<JsonAlbum> = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+    let albums: Vec<JsonAlbum> = serde_json::from_str(&contents)?;
 
     Ok(albums)
 }
 
 // Writes the json file utility use
-fn write_workspace_json(path: &Path, albums: Vec<JsonAlbum>) -> Result<(), String> {
-    let contents = serde_json::to_string(&albums).map_err(|e| e.to_string())?;
-    fs::write(path, contents).map_err(|e| e.to_string())?;
+fn write_workspace_json(path: &Path, albums: Vec<JsonAlbum>) -> Result<(), AppError> {
+    let contents = serde_json::to_string(&albums)?;
+    fs::write(path, contents)?;
 
     Ok(())
 }
@@ -422,24 +397,23 @@ pub async fn add_album_description(
     album_name: String,
     description: String,
     state: tauri::State<'_, Arc<BackendState>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let state = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         add_album_description_inner(&album_name, &description, &state)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 pub fn add_album_description_inner(
     album_name: &str,
     description: &str,
     state: &BackendState,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let db_path = state
         .local_db_storage_path
         .as_ref()
-        .ok_or("DB storage path not set".to_string())?;
+        .ok_or_else(|| AppError::CustomError("DB storage path not set".to_string()))?;
 
     let json_path = db_path.join("workspaces.json");
     let mut albums_temp: Vec<JsonAlbum> = load_workspace_json(&json_path)?;
@@ -457,11 +431,11 @@ pub fn add_album_description_inner(
 
 // TODO in future always add as sorted insertion to keep it sorted via date or name or soemthign else
 // although not neeeded
-pub fn add_album_to_json_file(album_name: String, album_description: String, root_path: String, album_date: SystemTime, state: &BackendState) -> Result<(), String>{
+pub fn add_album_to_json_file(album_name: String, album_description: String, root_path: String, album_date: SystemTime, state: &BackendState) -> Result<(), AppError>{
     let db_path = state
         .local_db_storage_path
         .as_ref()
-        .ok_or("DB storage path not set".to_string())?;
+        .ok_or_else(|| AppError::CustomError("DB storage path not set".to_string()))?;
 
     let json_path = db_path.join("workspaces.json");
     let mut albums_temp: Vec<JsonAlbum> = load_workspace_json(&json_path)?;
@@ -479,7 +453,7 @@ pub fn add_album_to_json_file(album_name: String, album_description: String, roo
 
 // TODO
 // change the album name in the json file utility func
-pub fn edit_album_name_json_file(album_name: String, new_album_name: String, state: &BackendState) -> Result<(), String> {
+pub fn edit_album_name_json_file(album_name: String, new_album_name: String, state: &BackendState) -> Result<(), AppError> {
     
     Ok(())
 }
@@ -488,22 +462,21 @@ pub fn edit_album_name_json_file(album_name: String, new_album_name: String, sta
 pub async fn delete_album_description(
     album_name: String,
     state: tauri::State<'_, Arc<BackendState>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let state = state.inner().clone();
     tokio::task::spawn_blocking(move || delete_album_description_inner(&album_name, &state))
-        .await
-        .map_err(|e| e.to_string())?
+        .await?
 }
 
 // deletes an album description only
 pub fn delete_album_description_inner(
     album_name: &str,
     state: &BackendState,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let db_path = state
         .local_db_storage_path
         .as_ref()
-        .ok_or("DB storage path not set".to_string())?;
+        .ok_or_else(|| AppError::CustomError("DB storage path not set".to_string()))?;
 
     let json_path = db_path.join("workspaces.json");
     let mut albums_temp: Vec<JsonAlbum> = load_workspace_json(&json_path)?;

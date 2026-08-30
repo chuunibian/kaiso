@@ -45,10 +45,11 @@ pub fn run() {
                 }
                 Some(&"full") => {
                     // will be in the format of /full/{filepath given}
-                    // rejoin everything after "full" back into the original path
-                    // let rest = &path[path.find("/full/").unwrap() + "/full/".len()..];
+                    // decode URL encoding (%20 -> space, etc) and strip \\?\ UNC prefix if present
                     let temp = path.strip_prefix("/full/").unwrap_or(path);
-                    PathBuf::from(temp)
+                    let decoded = urlencoding::decode(temp).unwrap_or(std::borrow::Cow::Borrowed(temp));
+                    let clean = decoded.strip_prefix(r"\\?\").unwrap_or(&decoded).to_string();
+                    PathBuf::from(clean)
                 }
                 trashed => return tauri::http::Response::builder()
                     .status(404)

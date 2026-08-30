@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, time::{Duration, SystemTime}};
 
+use crate::errors::AppError;
 use crate::temp_models::{BackendState, Image, ImageMetadata, ImageDimensions};
 use rusqlite::{params, Connection};
 
@@ -8,18 +9,17 @@ use rusqlite::{params, Connection};
 pub fn load_albumn(
     album_name: String,
     state: &BackendState,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let temp_album_db_path = state
         .local_db_storage_path
         .as_ref()
-        .unwrap()
+        .ok_or_else(|| AppError::CustomError("DB storage path not set".to_string()))?
         .join(format!("{}.db", album_name));
 
-    let conn = Connection::open(&temp_album_db_path).map_err(|e| e.to_string())?;
+    let conn = Connection::open(&temp_album_db_path)?;
 
     let mut stmt = conn
-        .prepare("SELECT id, embedding, path, size, name, created_at, modified_at, width, height FROM images")
-        .map_err(|e| e.to_string())?;
+        .prepare("SELECT id, embedding, path, size, name, created_at, modified_at, width, height FROM images")?;
 
     let row_iter = stmt.query_map([], |row| {
         let embedding_bytes: Vec<u8> = row.get(1)?;
@@ -49,12 +49,12 @@ pub fn load_albumn(
             name: row.get(4)?,
             path: PathBuf::from(path_str),
         })
-    }).map_err(|e| e.to_string())?;
+    })?;
 
     let mut temp_cache: HashMap<u64, Image> = HashMap::new();
 
     for res in row_iter {
-        let image = res.map_err(|e| e.to_string())?;
+        let image = res?;
         temp_cache.insert(image.id, image);
     }
 
@@ -69,32 +69,28 @@ pub fn load_albumn(
 pub fn create_albumn(
     album_name: String,
     state: &BackendState,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let temp_album_db_path = state
         .local_db_storage_path
         .as_ref()
-        .unwrap()
+        .ok_or_else(|| AppError::CustomError("DB storage path not set".to_string()))?
         .join(format!("{}.db", album_name));
 
-    let mut conn =
-        Connection::open(&temp_album_db_path).map_err(|e| format!("Failed to open DB: {}", e))?;
+    let mut conn = Connection::open(&temp_album_db_path)?;
 
-    let wc_guard = state
-        .workspace_cache
-        .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
+    let wc_guard = state.workspace_cache.lock()?;
     let album_cache = wc_guard
         .as_ref()
-        .unwrap()
+        .ok_or_else(|| AppError::CustomError("Current album cache empty".to_string()))?
         .album
         .as_ref()
-        .unwrap(); // later change unwrap to error handling
+        .ok_or_else(|| AppError::CustomError("Album cache empty".to_string()))?;
 
     conn.execute_batch(
         "PRAGMA journal_mode = WAL;
          PRAGMA synchronous = NORMAL;  
          PRAGMA cache_size = 10000;",
-    ).map_err(|e| e.to_string())?;
+    )?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS images (
@@ -109,17 +105,16 @@ pub fn create_albumn(
             height INTEGER NOT NULL DEFAULT 0
         )",
         [],
-    ).map_err(|e| e.to_string())?;
+    )?;
 
-    let temp_transaction = conn.transaction().map_err(|e| e.to_string())?;
+    let temp_transaction = conn.transaction()?;
 
     {
         let mut stmt = temp_transaction
             .prepare(
                 "INSERT OR REPLACE INTO images (id, embedding, size, path, name, created_at, modified_at, width, height)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            )
-            .map_err(|e| e.to_string())?;
+            )?;
 
         for (id, image) in album_cache.iter() {
             let empty_vec = Vec::new();
@@ -151,12 +146,11 @@ pub fn create_albumn(
                 modified_secs,
                 image.meta.dimensions.width,
                 image.meta.dimensions.height
-            ])
-            .map_err(|e| e.to_string())?;
+            ])?;
         }
     }
 
-    temp_transaction.commit().map_err(|e| e.to_string())?;
+    temp_transaction.commit()?;
 
     Ok(())
 }
