@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use crate::embedding_temp::{AppTokenizer, ClipTextModel, ClipVisionModel};
+use crate::errors::AppError;
 
 // BackendState is managed by Tauri as Arc<BackendState> (see lib.rs)
 // This lets blocking threads clone the Arc and call methods on BackendState directly.
@@ -30,8 +31,8 @@ pub struct BackendState {
 
 impl BackendState {
     // Can replace or place a cache to the state
-    pub fn set_active_cache(&self, cache: HashMap<u64, Image>) -> Result<(), String> {
-        let mut wc = self.workspace_cache.lock().map_err(|e| e.to_string())?;
+    pub fn set_active_cache(&self, cache: HashMap<u64, Image>) -> Result<(), AppError> {
+        let mut wc = self.workspace_cache.lock()?;
         *wc = Some(CurrentAlbum {
             album: Some(cache),
             flag: true,
@@ -40,64 +41,62 @@ impl BackendState {
         Ok(())
     }
 
-    pub fn set_current_workspace(&self, workspace: String) -> Result<(), String> {
-        let mut cw = self.current_workspace.lock().map_err(|e| e.to_string())?;
+    pub fn set_current_workspace(&self, workspace: String) -> Result<(), AppError> {
+        let mut cw = self.current_workspace.lock()?;
         *cw = workspace;
         Ok(())
     }
 
-    pub fn create_tokenizer(&self) -> Result<(), String> {
-        let res = self.resource_path.as_ref().ok_or("Resource path not set".to_string())?;
+    pub fn create_tokenizer(&self) -> Result<(), AppError> {
+        let res = self.resource_path.as_ref().ok_or_else(|| AppError::CustomError("Resource path not set".to_string()))?;
         let tok_path = res.join("models").join("tokenizer.json");
-        let mut tok = self.tokenizer.lock().map_err(|e| e.to_string())?;
+        let mut tok = self.tokenizer.lock()?;
         if tok.is_none() {
             *tok = Some(
-                AppTokenizer::new(tok_path.to_str().ok_or("Invalid tokenizer path")?).map_err(|e| e.to_string())?,
+                AppTokenizer::new(tok_path.to_str().ok_or_else(|| AppError::CustomError("Invalid tokenizer path".to_string()))?)?,
             );
         }
         Ok(())
     }
 
-    pub fn delete_tokenizer(&self) -> Result<(), String> {
-        let mut tok = self.tokenizer.lock().map_err(|e| e.to_string())?;
+    pub fn delete_tokenizer(&self) -> Result<(), AppError> {
+        let mut tok = self.tokenizer.lock()?;
         *tok = None;
         Ok(())
     }
 
-    pub fn create_vision_model(&self) -> Result<(), String> {
-        let res = self.resource_path.as_ref().ok_or("Resource path not set".to_string())?;
+    pub fn create_vision_model(&self) -> Result<(), AppError> {
+        let res = self.resource_path.as_ref().ok_or_else(|| AppError::CustomError("Resource path not set".to_string()))?;
         let model_path = res.join("models").join("vision_model.onnx");
-        let mut vm = self.vision_model.lock().map_err(|e| e.to_string())?;
+        let mut vm = self.vision_model.lock()?;
         if vm.is_none() {
             *vm = Some(
-                ClipVisionModel::new(model_path.to_str().ok_or("Invalid vision model path")?)
-                    .map_err(|e| e.to_string())?,
+                ClipVisionModel::new(model_path.to_str().ok_or_else(|| AppError::CustomError("Invalid vision model path".to_string()))?)?,
             );
         };
         Ok(())
     }
 
-    pub fn create_text_model(&self) -> Result<(), String> {
-        let res = self.resource_path.as_ref().ok_or("Resource path not set".to_string())?;
+    pub fn create_text_model(&self) -> Result<(), AppError> {
+        let res = self.resource_path.as_ref().ok_or_else(|| AppError::CustomError("Resource path not set".to_string()))?;
         let model_path = res.join("models").join("text_model.onnx");
-        let mut tm = self.text_model.lock().map_err(|e| e.to_string())?;
+        let mut tm = self.text_model.lock()?;
         if tm.is_none() {
             *tm = Some(
-                ClipTextModel::new(model_path.to_str().ok_or("Invalid text model path")?)
-                    .map_err(|e| e.to_string())?,
+                ClipTextModel::new(model_path.to_str().ok_or_else(|| AppError::CustomError("Invalid text model path".to_string()))?)?,
             );
         };
         Ok(())
     }
 
-    pub fn delete_vision_model(&self) -> Result<(), String> {
-        let mut tm = self.vision_model.lock().map_err(|e| e.to_string())?;
+    pub fn delete_vision_model(&self) -> Result<(), AppError> {
+        let mut tm = self.vision_model.lock()?;
         *tm = None;
         Ok(())
     }
 
-    pub fn delete_text_model(&self) -> Result<(), String> {
-        let mut tm = self.text_model.lock().map_err(|e| e.to_string())?;
+    pub fn delete_text_model(&self) -> Result<(), AppError> {
+        let mut tm = self.text_model.lock()?;
         *tm = None;
         Ok(())
     }

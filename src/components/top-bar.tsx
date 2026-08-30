@@ -6,7 +6,7 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "./ui/input";
-import { useGridStore, useConfigStore, useTopBarStateStore, useSelectedEntitiesStore, FilterStatus, FilterStatusDirection } from "@/lib/store";
+import { useGridStore, useConfigStore, useTopBarStateStore, useSelectedEntitiesStore, FilterStatus, FilterStatusDirection, handleBackendError } from "@/lib/store";
 import { virtuosoGridRef } from "@/lib/grid-ref";
 import type { ImageOrder } from "@/lib/types";
 
@@ -218,6 +218,7 @@ const TopBar = () => {
       useGridStore.getState().changeOrderedIds(result);
     } catch (e) {
       console.log(e);
+      handleBackendError(e);
     } finally {
       setIsSearching(false);
     }

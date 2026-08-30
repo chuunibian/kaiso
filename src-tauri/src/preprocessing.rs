@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use crate::errors::AppError;
 use fast_image_resize::images::Image as FirImage;
 use fast_image_resize::{PixelType, ResizeOptions, Resizer};
 use image::codecs::jpeg::JpegEncoder;
@@ -24,7 +25,7 @@ const CLIP_MEAN: [f32; 3] = [0.48145466, 0.4578275, 0.40821073];
 const CLIP_STD: [f32; 3] = [0.26862954, 0.26130258, 0.27577711];
 
 // gets an FS path to albumn scans it and returns valid image paths
-pub fn process_album_image_paths(albumn_path: &Path) -> Result<Vec<PathBuf>, String> {
+pub fn process_album_image_paths(albumn_path: &Path) -> Result<Vec<PathBuf>, AppError> {
     Ok(find_image_paths(albumn_path))
 }
 
@@ -35,7 +36,7 @@ pub fn preprocess_album(
     thumbnail_path: &PathBuf,
     album_name: &String,
     autoinc_counter: &AtomicI64,
-) -> Result<Vec<(Image, Array4<f32>)>, String> {
+) -> Result<Vec<(Image, Array4<f32>)>, AppError> {
     let target_size = 224;
 
     let tensors: Vec<(Image, Array4<f32>)> = paths
@@ -66,9 +67,9 @@ pub fn preprocess_album(
 }
 
 // wil create the thumbnail dir on request of the album creation
-pub fn create_thumbnail_dir(thumbnail_path: &PathBuf, album_name: &String) -> Result<(), String> {
+pub fn create_thumbnail_dir(thumbnail_path: &PathBuf, album_name: &String) -> Result<(), AppError> {
     let full_path = thumbnail_path.join(album_name);
-    fs::create_dir_all(&full_path).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&full_path)?;
     Ok(())
 }
 

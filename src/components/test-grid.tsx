@@ -6,13 +6,18 @@ import { Check } from "lucide-react";
 
 import { Skeleton } from "./ui/skeleton";
 import { virtuosoGridRef } from "../lib/grid-ref";
-import { useGridStore, useBottomBarStore, useConfigStore, useOverviewPanelStore, useTopBarStateStore, useSelectedEntitiesStore } from "../lib/store";
+import { useGridStore, useBottomBarStore, useConfigStore, useOverviewPanelStore, useTopBarStateStore, useSelectedEntitiesStore, handleBackendError } from "../lib/store";
 import type { ImageView } from "../lib/types";
 import { formatSize } from "../lib/utils";
 
 // one batched backend call for a window of ids
 async function fetchBatch(ids: number[]): Promise<ImageView[]> {
-    return invoke<ImageView[]>("lazy_load_data", { ids });
+    try {
+        return await invoke<ImageView[]>("lazy_load_data", { ids });
+    } catch (e) {
+        handleBackendError(e);
+        return [];
+    }
 }
 
 

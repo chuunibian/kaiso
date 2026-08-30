@@ -7,22 +7,23 @@
 // !! Note it is inefficeint to iterate over the hashmap it is much worse than a vec
 // maybe we can change datastrucutres to isolate the embedding + id determine score and sort and map it back?
 // overall iterating through a hashmap might be bad????
+use crate::errors::AppError;
 use crate::temp_models::{BackendState, ImageOrder};
 use simsimd::SpatialSimilarity;
 
 pub fn compute_sim(
     target_embedding: Vec<f32>,
     state: &BackendState,
-) -> Result<Vec<ImageOrder>, String> {
+) -> Result<Vec<ImageOrder>, AppError> {
     let mut ordering_ret = Vec::new();
-    let cache_guard = state.workspace_cache.lock().map_err(|e| e.to_string())?;
+    let cache_guard = state.workspace_cache.lock()?;
 
     let Some(curr_album) = cache_guard.as_ref() else {
-        return Err("No cache in backend".to_string());
+        return Err(AppError::CustomError("No cache in backend".to_string()));
     };
 
     let Some(cache) = curr_album.album.as_ref() else {
-        return Err("No album cache in backend".to_string());
+        return Err(AppError::CustomError("No album cache in backend".to_string()));
     };
 
     // for this part in the future need to add error checks

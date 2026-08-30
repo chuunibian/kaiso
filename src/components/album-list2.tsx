@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Circle, Calendar, Pencil, Trash2, Check, Loader2 } from "lucide-react";
-import { useGridStore, useConfigStore } from "@/lib/store";
+import { useGridStore, useConfigStore, handleBackendError } from "@/lib/store";
 import { invoke } from "@tauri-apps/api/core";
 import type { AlbumView } from "@/lib/types";
 
@@ -56,7 +56,7 @@ const AlbumList2: React.FC<AlbumList2Props> = ({
       setEditingWorkspaceName(null);
     } catch (e) {
       console.error(e);
-      alert("Failed to save description: " + e);
+      handleBackendError(e);
     }
   };
 
@@ -72,7 +72,7 @@ const AlbumList2: React.FC<AlbumList2Props> = ({
       setConfirmDeleteWorkspaceName(null);
     } catch (e) {
       console.error(e);
-      alert("Failed to delete workspace: " + e);
+      handleBackendError(e);
     } finally {
       setDeleteLoading(null);
     }

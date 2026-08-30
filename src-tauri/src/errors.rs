@@ -19,7 +19,7 @@ pub enum AppError {
     TauriError(#[from] tauri::Error),
 
     #[error("ONNX Runtime error: {0}")]
-    OrtError(#[from] ort::Error),
+    OrtError(String),
 
     #[error("Tokenizer error: {0}")]
     TokenizerError(#[from] tokenizers::Error),
@@ -57,6 +57,9 @@ pub enum AppError {
 
     #[error("Internal error: {0}")]
     AnyhowError(String),
+
+    #[error("Lock error: {0}")]
+    LockError(String),
 }
 
 // Obj for error sent to frontend
@@ -158,6 +161,11 @@ impl Serialize for AppError {
                 library_generated_error_desc: "N/A".to_string(),
                 err_code: 18,
             },
+            AppError::LockError(str) => BackendError {
+                user_error_string_desc: str.to_string(),
+                library_generated_error_desc: "N/A".to_string(),
+                err_code: 19,
+            },
         };
 
         return resp.serialize(serializer);
@@ -167,5 +175,17 @@ impl Serialize for AppError {
 impl From<anyhow::Error> for AppError {
     fn from(err: anyhow::Error) -> Self {
         AppError::AnyhowError(err.to_string())
+    }
+}
+
+impl<T> From<std::sync::PoisonError<T>> for AppError {
+    fn from(e: std::sync::PoisonError<T>) -> Self {
+        AppError::LockError(e.to_string())
+    }
+}
+
+impl<T> From<ort::Error<T>> for AppError {
+    fn from(e: ort::Error<T>) -> Self {
+        AppError::OrtError(e.to_string())
     }
 }
