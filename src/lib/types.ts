@@ -3,6 +3,12 @@ export interface SystemTime {
   nanos_since_epoch: number;
 }
 
+export interface BackendError {
+  user_error_string_desc: String,
+  library_generated_error_desc: String,
+  err_code: number,
+}
+
 export interface ImageMetadata {
   date_created: SystemTime;
   size: number;

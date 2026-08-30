@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { useConfigStore, useGridStore, useOverviewPanelStore, useBottomBarStore } from "@/lib/store";
+import { useConfigStore, useGridStore, useOverviewPanelStore, useBottomBarStore, handleBackendError } from "@/lib/store";
 import type { ImageView } from "@/lib/types";
 
 const ImgViewScreen = () => {
@@ -68,6 +68,7 @@ const ImgViewScreen = () => {
                     }
                 } catch (e) {
                     console.error("Failed to load image preview data", e);
+                    handleBackendError(e);
                 }
             }
 
@@ -110,7 +111,7 @@ const ImgViewScreen = () => {
 
     // Scroll to zoom
     const handleWheel = useCallback((e: React.WheelEvent) => {
-        e.preventDefault();
+        // e.preventDefault();
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
         setScale((prev) => {
             const next = Math.min(Math.max(prev + delta, 0.1), 10);
@@ -125,7 +126,7 @@ const ImgViewScreen = () => {
     const handleMouseDown = useCallback(
         (e: React.MouseEvent) => {
             if (scale <= 1) return;
-            e.preventDefault();
+            // e.preventDefault();
             setIsPanning(true);
             panStart.current = { x: e.clientX, y: e.clientY };
             translateStart.current = { ...translate };

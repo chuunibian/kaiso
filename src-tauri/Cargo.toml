@@ -38,4 +38,5 @@ rusqlite = "0.32.1"
 bytemuck = "1.18"
 thiserror = "1"
 tokio = { version = "1", features = ["full"] }
+urlencoding = "2.1"
 

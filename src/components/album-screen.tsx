@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { X, Search, Plus, RotateCw } from "lucide-react";
 import CustomPath from "./folderclicker";
 import AlbumList2 from "./album-list2";
-import { useGridStore, useConfigStore, useFrontendProgressStore } from "@/lib/store";
+import { useGridStore, useConfigStore, useFrontendProgressStore, handleBackendError } from "@/lib/store";
 import { invoke } from "@tauri-apps/api/core";
 import type { ImageOrder, AlbumView, Progress } from "@/lib/types";
 import { listen } from "@tauri-apps/api/event";
@@ -31,6 +31,7 @@ const AlbumScreen = () => {
       setWorkspaces(data);
     } catch (e) {
       console.error("Failed to find workspaces:", e);
+      handleBackendError(e);
     }
   };
 
@@ -73,6 +74,7 @@ const AlbumScreen = () => {
           useGridStore.getState().changeOrderedIds(result);
         } catch (err) {
           console.log("get_default_ids failed:", err);
+          handleBackendError(err);
         }
 
         fetchWorkspaces();
@@ -88,7 +90,7 @@ const AlbumScreen = () => {
         console.error(e);
         setIsIndexing(false);
 
-        alert("Failed to create workspace: " + e);
+        handleBackendError(e);
 
         unlisten1();
         unlisten2();
@@ -110,13 +112,14 @@ const AlbumScreen = () => {
         useGridStore.getState().changeOrderedIds(ids);
       } catch (err) {
         console.log("get_default_ids failed:", err);
+        handleBackendError(err);
       }
 
       setWorkspace(workspaceName);
       setAlbumScreenOpen(false);
     } catch (e) {
       console.error("Failed to load workspace:", e);
-      alert("Failed to load workspace: " + e);
+      handleBackendError(e);
     } finally {
       setActionLoading(null);
     }

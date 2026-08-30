@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useGridStore, useConfigStore } from "@/lib/store";
+import { useGridStore, useConfigStore, handleBackendError } from "@/lib/store";
 import { invoke } from "@tauri-apps/api/core";
 import { Calendar, Search, ArrowRight, Folder } from "lucide-react";
 import type { AlbumView, ImageOrder } from "@/lib/types";
@@ -30,6 +30,7 @@ const AlbumList: React.FC<AlbumListProps> = ({
                 setWorkspaces(data);
             } catch (e) {
                 console.error("Failed to find workspaces:", e);
+                handleBackendError(e);
             }
         };
         fetchWorkspaces();
@@ -57,6 +58,7 @@ const AlbumList: React.FC<AlbumListProps> = ({
             setAlbumScreenOpen(false);
         } catch (e) {
             console.error("Failed to load album:", e);
+            handleBackendError(e);
         } finally {
             setIsLoading(null);
         }

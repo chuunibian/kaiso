@@ -3,6 +3,7 @@ import { ThemeProvider } from "./components/theme-provider";
 import AlbumScreen from "./components/album-screen";
 import { Titlebar } from "./components/titlebar";
 import { useGridStore } from "./lib/store";
+import { Toaster } from "./components/ui/toaster";
 
 function App() {
   const isAlbumScreenOpen = useGridStore((s) => s.isAlbumScreenOpen);
@@ -17,6 +18,7 @@ function App() {
           {isAlbumScreenOpen && <AlbumScreen />}
         </div>
       </div>
+      <Toaster />
     </ThemeProvider>
   );
 }

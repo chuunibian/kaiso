@@ -7,6 +7,7 @@ import type {
     ImageFrontendRepresentation,
     AlbumView,
     SelectedOverviewImage,
+    BackendError,
 } from "./types";
 
 // TODO MAKE THIS A STATE!
@@ -20,6 +21,34 @@ function thumbLink(id: number, workspace: string): string {
 // backend ImageView -> frontend row (drop id from the body, add the thumb link)
 function toFrontend(v: ImageView, workspace: string): ImageFrontendRepresentation {
     return { name: v.name, meta: v.meta, path: v.path, thumbLink: thumbLink(v.id, workspace) };
+}
+
+interface ErrorStore {
+    currentBackendErrors: BackendError[];
+    setCurrentBackendError: (newError: BackendError) => void; // send current backend error based on a new 
+}
+
+import { toast } from "sonner";
+
+export const useErrorStore = create<ErrorStore>((set) => ({
+    currentBackendErrors: [],
+    setCurrentBackendError: (newError) => set((state) => ({ // append new error to list and forces ref change
+        currentBackendErrors: [...state.currentBackendErrors, newError]
+    })),
+}));
+
+export function handleBackendError(err: string): BackendError {
+
+    const backendErr: BackendError = {
+        user_error_string_desc: err,
+        library_generated_error_desc: "N/A",
+        err_code: 0,
+    };
+
+    useErrorStore.getState().setCurrentBackendError(backendErr);
+    toast.error(err);
+
+    return backendErr;
 }
 
 interface FrontendProgressStore {
