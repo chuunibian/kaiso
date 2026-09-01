@@ -1,12 +1,12 @@
-use anyhow::{Context, Result};
 use crate::errors::AppError;
+use anyhow::{Context, Result};
+use exif;
 use fast_image_resize::images::Image as FirImage;
 use fast_image_resize::{PixelType, ResizeOptions, Resizer};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageFormat, ImageReader, RgbImage};
 use jwalk::WalkDir;
-use exif;
 use ndarray::Array4;
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Instant, SystemTime};
 use twox_hash::XxHash64;
 
-use crate::temp_models::{Image, ImageMetadata, ImageDimensions};
+use crate::temp_models::{Image, ImageDimensions, ImageMetadata};
 
 const CLIP_SIZE: u32 = 224;
 const CLIP_MEAN: [f32; 3] = [0.48145466, 0.4578275, 0.40821073];
@@ -31,6 +31,7 @@ pub fn process_album_image_paths(albumn_path: &Path) -> Result<Vec<PathBuf>, App
 
 // takes in albumn paths and then preprocesses into tensors
 // It is driving function and it has the par iter
+/// this is one shot version not intended to be called many times
 pub fn preprocess_album(
     paths: Vec<PathBuf>,
     thumbnail_path: &PathBuf,
@@ -51,7 +52,7 @@ pub fn preprocess_album(
             let mut temp2 = recolor_image(temp1); // mut for pass into resize as view?
             let temp_thumb_resize = resize_image_thumb(&mut temp2).unwrap(); // mut ref need to be passed in
             let temp3 = resize_image(temp2, target_size).unwrap(); // takes ownership
-            // let temp3 = resize_image(temp_thumb_resize.clone(), target_size).unwrap(); // diff ver
+                                                                   // let temp3 = resize_image(temp_thumb_resize.clone(), target_size).unwrap(); // diff ver
 
             // for thumbnail !!!
             temp_thumbnail_save(&temp_thumb_resize, image_id, thumbnail_path, album_name)
@@ -66,6 +67,66 @@ pub fn preprocess_album(
     Ok(tensors)
 }
 
+// This is specifically the chunked version, should take in a chunked vec of paths
+// wraps around the parallized option or some other option like non parallized
+// will usually be called mulitple times
+pub fn preprocess_album_chunked(
+    chunked_paths: Vec<PathBuf>,
+    thumbnail_path: &PathBuf,
+    album_name: &String,
+    autoinc_counter: &AtomicI64,
+) -> Result<Vec<(Image, Array4<f32>)>, AppError> {
+    let target_size = 224;
+
+    parallized_preproc_to_tensor(
+        chunked_paths,
+        thumbnail_path,
+        album_name,
+        autoinc_counter,
+        target_size,
+    )
+}
+
+// gets chunk of paths and returns tensors for that chunk
+// Doing this in chunk by chunk should be ok with the thumbnail and other stuff
+pub fn parallized_preproc_to_tensor(
+    chunked_paths: Vec<PathBuf>,
+    thumbnail_path: &PathBuf,
+    album_name: &String,
+    autoinc_counter: &AtomicI64,
+    target_size: u64,
+) -> Result<Vec<(Image, Array4<f32>)>, AppError> {
+    let tensors: Vec<(Image, Array4<f32>)> = chunked_paths
+        .par_iter()
+        .map(|path| {
+            let image_id = autoinc_counter.fetch_add(1, Ordering::Relaxed) as u64;
+
+            let (temp_img, temp1) = load_image(path, image_id).unwrap();
+            let mut temp2 = recolor_image(temp1);
+            let temp_thumb_resize = resize_image_thumb(&mut temp2).unwrap();
+            let temp3 = resize_image(temp2, target_size as u32).unwrap();
+
+            // for thumbnail !!!
+            temp_thumbnail_save(&temp_thumb_resize, image_id, thumbnail_path, album_name)
+                .expect("failed to save thumbnail.");
+
+            let temp4 = preprocess_rgb_image_to_clip(temp3);
+
+            (temp_img, temp4)
+        })
+        .collect();
+
+    Ok(tensors)
+}
+
+// Given all valid paths and returns a list of vec chuncked
+// Used at a higher level to split up the big paths that was originally passed into the original preprocess album
+pub fn valid_path_chunking(paths: Vec<PathBuf>) -> Result<Vec<Vec<PathBuf>>, AppError> {
+    const CHUNK_C: usize = 5333;
+    let chunks: Vec<Vec<PathBuf>> = paths.chunks(CHUNK_C).map(|c| c.to_vec()).collect();
+    Ok(chunks)
+}
+
 // wil create the thumbnail dir on request of the album creation
 pub fn create_thumbnail_dir(thumbnail_path: &PathBuf, album_name: &String) -> Result<(), AppError> {
     let full_path = thumbnail_path.join(album_name);
@@ -74,7 +135,12 @@ pub fn create_thumbnail_dir(thumbnail_path: &PathBuf, album_name: &String) -> Re
 }
 
 // This function also needs to get some sort of auto incrementing number unique to a workspace
-fn temp_thumbnail_save(img_view: &RgbImage, id: u64, thumbnail_path: &PathBuf, album_name: &String) -> Result<()> {
+fn temp_thumbnail_save(
+    img_view: &RgbImage,
+    id: u64,
+    thumbnail_path: &PathBuf,
+    album_name: &String,
+) -> Result<()> {
     let filename = format!("{}.jpg", id);
     let full_path = thumbnail_path.join(album_name).join(filename);
 
@@ -82,7 +148,6 @@ fn temp_thumbnail_save(img_view: &RgbImage, id: u64, thumbnail_path: &PathBuf, a
 
     Ok(())
 }
-
 
 // TODO this is no longer relevant however can keep it
 pub fn hash_path_id(path: &str) -> u64 {
@@ -125,7 +190,6 @@ pub fn find_image_paths(root: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-
 fn get_exif_orientation(path: &Path) -> u32 {
     (|| -> Result<u32> {
         let file = File::open(path)?;
@@ -152,7 +216,7 @@ fn extract_image_metadata(path: &Path, image: &DynamicImage) -> Result<ImageMeta
         dimensions: ImageDimensions {
             width: image.width(),
             height: image.height(),
-        }
+        },
     })
 }
 
