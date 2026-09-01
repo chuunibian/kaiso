@@ -1,7 +1,7 @@
-# Tauri + React + Typescript
+# Kaiso
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Local first scaled image semantic search.
 
-## Recommended IDE Setup
+# Pre-release prototype development image
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+https://github.com/user-attachments/assets/111987d3-bedc-48cf-86b1-841827fdc167
