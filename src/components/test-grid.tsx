@@ -128,9 +128,11 @@ function ImageCell({ id, score }: { id: number; score: number }) {
                     </div>
                 )}
                 {/* Confidence score badge */}
-                <div className="absolute top-0.5 right-0.5 bg-black/75 text-[11px] text-white/80 group-hover:text-pink-300 transition-colors duration-150 px-1 py-px rounded-sm font-mono leading-none select-none">
-                    {score.toFixed(4)}
-                </div>
+                {score > 0 && (
+                    <div className="absolute top-2 right-2 bg-zinc-950/80 backdrop-blur-md text-[10px] text-zinc-300 group-hover:text-pink-300 border border-zinc-700/50 shadow-md px-2 py-0.5 rounded-full font-mono leading-none select-none">
+                        {score.toFixed(3)}
+                    </div>
+                )}
             </div>
 
             {/* File info below thumbnail */}

@@ -1,5 +1,6 @@
+// claude diff test
 use crate::errors::AppError;
-use crate::temp_models::JsonAlbum;
+use crate::temp_models::{JsonAlbum, Progress};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -11,8 +12,8 @@ use tauri::{AppHandle, Emitter};
 use crate::{
     cosine_sim::compute_sim,
     db::{create_albumn, load_albumn},
-    preprocessing::{find_image_paths, merge_image_and_embeddings, preprocess_album, create_thumbnail_dir},
-    temp_models::{AlbumView, BackendState, ImageOrder, ImageView},
+    preprocessing::{find_image_paths, merge_image_and_embeddings, preprocess_album, preprocess_album_chunked, valid_path_chunking, create_thumbnail_dir},
+    temp_models::{AlbumView, BackendState, Image, ImageOrder, ImageView},
 };
 
 // basically goes through the cache and returns default list of ids this is needed for general initial loading of img on FE
@@ -112,7 +113,6 @@ pub async fn lazy_load_data_inner(
 
 
 // TODO in future send in a custom struct that encapsulates the root path name and desc
-
 #[tauri::command]
 pub async fn create_workspace(
     target: &str,
@@ -131,6 +131,43 @@ pub async fn create_workspace(
     Ok("done".to_string())
 }
 
+fn chunked_preprocess_indexing_wrapper(
+    app: &AppHandle,
+    chunked_paths: Vec<Vec<PathBuf>>,
+    thumbnail_path: &PathBuf,
+    album_name: &String,
+    autoinc_counter: &AtomicI64,
+    state: &BackendState,
+) -> Result<(Vec<Image>, Vec<Vec<f32>>), AppError> {
+    let mut embeddings: Vec<Vec<f32>> = Vec::new();
+    let mut images_aggregation: Vec<Image> = Vec::new();
+    let mut chunk_counter = 1;
+
+
+    for chunk in chunked_paths {
+
+        // Reset progress UI for the new chunk
+        app.emit("embed-progress", Progress { done: 0, total: 0 })?;
+
+        emit_utility(app, "create-workspace", format!("Preprocessing Chunk {chunk_counter}..."))?;
+        let prepared = preprocess_album_chunked(chunk, thumbnail_path, album_name, autoinc_counter)?;
+        let (images, tensors): (Vec<Image>, Vec<ndarray::Array4<f32>>) = prepared.into_iter().unzip();
+
+        emit_utility(app, "create-workspace", format!("Embedding Chunk {chunk_counter}..."))?;
+        let vm_guard = state.vision_model.lock()?;
+        let temp: Vec<Vec<f32>> = vm_guard
+            .as_ref()
+            .ok_or_else(|| AppError::CustomError("Vision model not loaded".to_string()))?
+            .embed_batch_list_with_progress(tensors, app)?;
+
+        embeddings.extend(temp);
+        images_aggregation.extend(images);
+        chunk_counter += 1;
+    }
+
+    Ok((images_aggregation, embeddings))
+}
+
 fn create_workspace_inner(
     target: &str,
     album_name: String,
@@ -138,53 +175,57 @@ fn create_workspace_inner(
     state: &BackendState,
     app: &AppHandle,
 ) -> Result<(), AppError> {
-
     let path: &Path = Path::new(target);
     let thumbnail_path = state
         .local_thumbnail_storage_path
         .as_ref()
-        .ok_or_else(|| AppError::CustomError("Temp error".to_string()))?;
+        .ok_or_else(|| AppError::CustomError("Thumbnail path not set".to_string()))?;
 
     emit_utility(app, "create-workspace", "Scanning for valid image paths...")?;
     let valid_image_paths: Vec<PathBuf> = find_image_paths(path);
-    let id_counter = AtomicI64::new(0); // each workspace creation needs new auto inc id counter
-
-    emit_utility(app, "create-workspace", "Preprocessing images...")?;
-    let preproc_start = std::time::Instant::now();
-    create_thumbnail_dir(&thumbnail_path, &album_name)?; // create the thumbnail dir for new workspace
-    let prepared = preprocess_album(valid_image_paths, thumbnail_path, &album_name, &id_counter)?;
-    let preproc_duration = preproc_start.elapsed();
-    let (images, tensors) = prepared.into_iter().unzip();
+    let id_counter = AtomicI64::new(0);
 
     state.create_vision_model()?;
+    create_thumbnail_dir(&thumbnail_path, &album_name)?;
 
-    emit_utility(app, "create-workspace", "Embedding images...")?;
-    let vm_guard = state.vision_model.lock()?;
-    let inference_start = std::time::Instant::now();
-    let embeddings: Vec<Vec<f32>> = vm_guard.as_ref().ok_or_else(|| AppError::CustomError("Vision model not loaded".to_string()))?.embed_batch_list_with_progress(tensors, app)?;
-    let inference_duration = inference_start.elapsed();
+    let chunked_paths: Vec<Vec<PathBuf>> = valid_path_chunking(valid_image_paths)?;
 
-    // Drop lock release vm and then delete vm as not needed
-    drop(vm_guard);
+    let (images, embeddings) = chunked_preprocess_indexing_wrapper(
+        app,
+        chunked_paths,
+        &thumbnail_path,
+        &album_name,
+        &id_counter,
+        state,
+    )?;
+
     state.delete_vision_model()?;
 
-    // Merge uncomplete Image with embeddings to complete the list of Img
     let cache = merge_image_and_embeddings(images, embeddings)?;
 
-    // set the active cache to newly created map
     state.set_active_cache(cache)?;
 
-    // call db functions for this create album
-    // Reads from the BE cache
     emit_utility(app, "create-workspace", "Creating workspace in database...")?;
     create_albumn(album_name.clone(), state)?;
 
-    // create the album in the json file
     emit_utility(app, "create-workspace", "Finalizing workspace...")?;
     add_album_to_json_file(album_name.clone(), album_description, target.to_string(), std::time::SystemTime::now(), state)?;
 
     Ok(())
 }
+
+// TODO in the future use to determine if chunking process is needed 
+// and will also return in the future the recommended chunk size if chunking is needed
+// pub fn detect_chunking() -> Result<(), AppError> {
+
+// }
+
+// TODO for this function in the future will determine all relevant perforamcne metrics at one point in time
+// used for profiling performance for indexing and etc
+// new models structs should be crated for this
+// pub fn sys_performance_metrics() -> Result<(), AppError> {
+
+// }
 
 pub fn emit_utility<T: Serialize + Clone>(
     app: &AppHandle,

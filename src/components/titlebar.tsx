@@ -1,4 +1,4 @@
-// components/Titlebar.tsx
+import React, { useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minus, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ const appWindow = getCurrentWindow();
 
 export function Titlebar() {
     const isIndexing = useConfigStore((s) => s.isIndexing);
+    const [isEasterEgg, setIsEasterEgg] = useState(false);
 
     return (
         <div
@@ -15,10 +16,10 @@ export function Titlebar() {
             className="flex h-8 select-none items-center justify-between bg-background border-b border-border relative overflow-hidden"
         >
             <span
-                data-tauri-drag-region
-                className={`px-3 text-xs font-semibold tracking-wider z-10 ${
-                    isIndexing ? "kaiso-logo" : "text-muted-foreground"
-                }`}
+                onClick={() => setIsEasterEgg((prev) => !prev)}
+                className={`px-3 text-xs font-semibold tracking-wider z-10 cursor-pointer hover:opacity-80 transition-all ${isIndexing ? "kaiso-logo" : "text-muted-foreground"
+                    }`}
+                title="回想"
             >
                 <style>{`
                     @keyframes kaiso-shimmer {
@@ -45,7 +46,7 @@ export function Titlebar() {
                         animation: kaiso-shimmer 3.5s ease-in-out infinite;
                     }
                 `}</style>
-                kaiso
+                {isEasterEgg ? "回想" : "kaiso"}
             </span>
 
 

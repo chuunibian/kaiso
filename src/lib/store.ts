@@ -15,7 +15,7 @@ const WORKSPACE = "N/A";
 
 // kaiso://localhost/{workspace}/{id} — matches your register_uri_scheme_protocol
 function thumbLink(id: number, workspace: string): string {
-    return `http://kaiso.localhost/thumb/${workspace}/${id}`;
+    return `http://kaiso.localhost/thumb/${encodeURIComponent(workspace)}/${id}`;
 }
 
 // backend ImageView -> frontend row (drop id from the body, add the thumb link)
