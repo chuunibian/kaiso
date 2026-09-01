@@ -128,8 +128,8 @@ const AlbumScreen = () => {
   // Render Create Workspace Form
   if (view === 'create') {
     return (
-      <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md">
-        <Card className="w-full max-w-lg mx-4 p-6 shadow-2xl relative border bg-card">
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4">
+        <Card className="w-full max-w-lg p-6 shadow-2xl relative border bg-card max-h-[85vh] flex flex-col overflow-hidden">
           <button
             onClick={() => setAlbumScreenOpen(false)}
             className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer transition-colors z-20"
@@ -138,13 +138,13 @@ const AlbumScreen = () => {
             <X className="h-5 w-5" />
           </button>
 
-          <CardHeader className="p-0 mb-4">
+          <CardHeader className="p-0 mb-4 shrink-0">
             <CardTitle className="text-xs font-semibold text-muted-foreground tracking-wide uppercase">
               Create New Workspace
             </CardTitle>
           </CardHeader>
 
-          <CardContent className="p-0 space-y-4">
+          <CardContent className="p-0 space-y-4 flex-1 min-h-0 overflow-y-auto pr-1 scrollbar-thin">
             <div className="space-y-1">
               <span className="text-xs font-medium text-muted-foreground">Workspace Name:</span>
               <Input
@@ -188,8 +188,8 @@ const AlbumScreen = () => {
 
   // Render List view (Default)
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <Card className="w-full max-w-3xl mx-4 p-8 shadow-2xl relative rounded-3xl border border-border bg-card overflow-hidden">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <Card className="w-full max-w-3xl p-6 sm:p-8 shadow-2xl relative rounded-3xl border border-border bg-card max-h-[85vh] flex flex-col overflow-hidden">
         {/* Exit Button */}
         <button
           onClick={() => setAlbumScreenOpen(false)}
@@ -200,7 +200,7 @@ const AlbumScreen = () => {
         </button>
 
         {/* Search bar + action buttons merged into one row */}
-        <div className="flex items-center gap-2 mb-6 pr-8">
+        <div className="flex items-center gap-2 mb-6 pr-8 shrink-0">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -237,7 +237,7 @@ const AlbumScreen = () => {
         </div>
 
         {/* Workspace List Container */}
-        <CardContent className="p-0">
+        <CardContent className="p-0 flex-1 min-h-0 flex flex-col overflow-hidden">
           <AlbumList2
             searchQuery={searchQuery}
             onLoadWorkspace={handleLoadWorkspace}

@@ -13,8 +13,8 @@ import {
 
 // Fixed grid. The mosaic is a progress bar that happens to look like a
 // library — tiles are NOT mapped 1:1 to images (you'd get 3 tiles or 100k).
-const COLS = 20;
-const ROWS = 12;
+const COLS = 10;
+const ROWS = 6;
 const TILE_COUNT = COLS * ROWS;
 const EMPTY_TILE = "#0c0c0c";
 
@@ -83,9 +83,6 @@ export function IndexingView() {
                 <div className="flex items-center gap-3">
                     {/* status icon with Loader spinner ring */}
                     <div className={`relative flex items-center justify-center h-6 w-6 ${color}`}>
-                        {/* {isActive && (
-                            <LoaderIcon className="absolute h-7 w-7 animate-spin opacity-100" />
-                        )} */}
                         <Icon className={`h-5 w-5 ${anim}`} />
                     </div>
 

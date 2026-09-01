@@ -92,7 +92,7 @@ const AlbumList2: React.FC<AlbumList2Props> = ({
   });
 
   return (
-    <div className="max-h-[520px] overflow-y-auto space-y-3 pr-1.5 scrollbar-thin">
+    <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1.5 scrollbar-thin">
       {filteredWorkspaces.length > 0 ? (
         filteredWorkspaces.map((album) => {
           const dateStr = album.date
