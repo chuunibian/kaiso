@@ -40,8 +40,9 @@ pub fn run() {
                             .body(Vec::new())
                             .unwrap(),
                     };
+                    let decoded_ws = urlencoding::decode(workspace).unwrap_or(std::borrow::Cow::Borrowed(workspace));
                     let dir = state.local_thumbnail_storage_path.as_ref().unwrap();
-                    dir.join(workspace).join(format!("{id}.jpg"))
+                    dir.join(decoded_ws.as_ref()).join(format!("{id}.jpg"))
                 }
                 Some(&"full") => {
                     // will be in the format of /full/{filepath given}
