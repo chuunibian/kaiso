@@ -129,7 +129,7 @@ function ImageCell({ id, score }: { id: number; score: number }) {
                 )}
                 {/* Confidence score badge */}
                 {score > 0 && (
-                    <div className="absolute top-2 right-2 bg-zinc-950/80 backdrop-blur-md text-[10px] text-zinc-300 group-hover:text-pink-300 border border-zinc-700/50 shadow-md px-2 py-0.5 rounded-full font-mono leading-none select-none">
+                    <div className="absolute top-2 right-2 bg-zinc-950/80 backdrop-blur-md text-xs text-zinc-300 group-hover:text-pink-300 border border-zinc-700/50 shadow-md px-2 py-0.5 rounded-full font-mono leading-none select-none">
                         {score.toFixed(3)}
                     </div>
                 )}
