@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { useConfigStore, useGridStore, useOverviewPanelStore, useBottomBarStore, handleBackendError } from "@/lib/store";
+import { useConfigStore, useGridStore, useOverviewPanelStore, useBottomBarStore, handleBackendError, KAISO_BASE } from "@/lib/store";
 import type { ImageView } from "@/lib/types";
 
 const ImgViewScreen = () => {
@@ -157,7 +157,7 @@ const ImgViewScreen = () => {
         setTranslate({ x: 0, y: 0 });
     }, [currentPreviewPath]);
 
-    const imageUrl = `http://kaiso.localhost/full/${currentPreviewPath}`;
+    const imageUrl = `${KAISO_BASE}/full/${currentPreviewPath}`;
     const currentName = currentPreviewId != null ? useGridStore.getState().cache.get(currentPreviewId)?.name : "";
 
     return (

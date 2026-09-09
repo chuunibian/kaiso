@@ -1,5 +1,6 @@
 // store.ts
 import { create } from "zustand";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import type {
     OrderedRankItems,
     ImageViewCache,
@@ -13,9 +14,20 @@ import type {
 // TODO MAKE THIS A STATE!
 const WORKSPACE = "N/A";
 
-// kaiso://localhost/{workspace}/{id} — matches your register_uri_scheme_protocol
+// Origin for the `kaiso` custom protocol registered in src-tauri/src/lib.rs.
+// Tauri serves custom protocols differently per platform:
+//   Windows/Android -> http://kaiso.localhost/...
+//   macOS/Linux     -> kaiso://localhost/...
+// convertFileSrc knows which, so derive the origin from it once. We only ask it
+// for the origin (empty path) and append route segments ourselves, because
+// convertFileSrc encodeURIComponent's its whole argument, which would turn the
+// "/" separators of our /thumb/... and /full/... routes into %2F and break
+// routing in the Rust handler.
+export const KAISO_BASE = convertFileSrc("", "kaiso").replace(/\/$/, "");
+
+// {KAISO_BASE}/thumb/{workspace}/{id} — matches register_uri_scheme_protocol
 function thumbLink(id: number, workspace: string): string {
-    return `http://kaiso.localhost/thumb/${encodeURIComponent(workspace)}/${id}`;
+    return `${KAISO_BASE}/thumb/${encodeURIComponent(workspace)}/${id}`;
 }
 
 // backend ImageView -> frontend row (drop id from the body, add the thumb link)
