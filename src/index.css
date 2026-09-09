@@ -177,11 +177,39 @@
     @apply border-border outline-ring/50;
   }
 
-  html, body, #root {
+  html,
+  body,
+  #root {
     @apply bg-background text-foreground font-sans;
     overscroll-behavior: none;
     overscroll-behavior-x: none;
     overscroll-behavior-y: none;
+  }
+}
+
+@keyframes stage-dot-blink {
+
+  0%,
+  100% {
+    opacity: 0.05;
+    transform: scale(0.75);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes stage-bar-blink {
+
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+
+  50% {
+    opacity: 1;
   }
 }
 

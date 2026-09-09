@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
-use crate::embedding_temp::{AppTokenizer, ClipTextModel, ClipVisionModel};
+use crate::embedding_temp::{
+    BLIPTokenizer, BLIPVisionEncoder, BLIPitmHead, CLIPTokenizer, ClipTextModel, ClipVisionModel,
+};
 use crate::errors::AppError;
 
 // BackendState is managed by Tauri as Arc<BackendState> (see lib.rs)
@@ -26,7 +28,11 @@ pub struct BackendState {
 
     pub vision_model: Mutex<Option<ClipVisionModel>>,
     pub text_model: Mutex<Option<ClipTextModel>>,
-    pub tokenizer: Mutex<Option<AppTokenizer>>,
+    pub CLIPtokenizer: Mutex<Option<CLIPTokenizer>>,
+    pub BLIPtokenizer: Mutex<Option<BLIPTokenizer>>,
+
+    pub BLIPvision_model: Mutex<Option<BLIPVisionEncoder>>,
+    pub BLIPitm_model: Mutex<Option<BLIPitmHead>>,
 }
 
 impl BackendState {
@@ -47,20 +53,39 @@ impl BackendState {
         Ok(())
     }
 
-    pub fn create_tokenizer(&self) -> Result<(), AppError> {
+    pub fn create_clip_tokenizer(&self) -> Result<(), AppError> {
         let res = self.resource_path.as_ref().ok_or_else(|| AppError::CustomError("Resource path not set".to_string()))?;
         let tok_path = res.join("models").join("tokenizer.json");
-        let mut tok = self.tokenizer.lock()?;
+        let mut tok = self.CLIPtokenizer.lock()?;
         if tok.is_none() {
             *tok = Some(
-                AppTokenizer::new(tok_path.to_str().ok_or_else(|| AppError::CustomError("Invalid tokenizer path".to_string()))?)?,
+                CLIPTokenizer::new(tok_path.to_str().ok_or_else(|| AppError::CustomError("Invalid CLIP tokenizer path".to_string()))?)?,
             );
         }
         Ok(())
     }
 
-    pub fn delete_tokenizer(&self) -> Result<(), AppError> {
-        let mut tok = self.tokenizer.lock()?;
+    // bert wordpiece, a seperate file from the clip one
+    pub fn create_blip_tokenizer(&self) -> Result<(), AppError> {
+        let res = self.resource_path.as_ref().ok_or_else(|| AppError::CustomError("Resource path not set".to_string()))?;
+        let tok_path = res.join("models").join("blip_tokenizer.json");
+        let mut tok = self.BLIPtokenizer.lock()?;
+        if tok.is_none() {
+            *tok = Some(
+                BLIPTokenizer::new(tok_path.to_str().ok_or_else(|| AppError::CustomError("Invalid BLIP tokenizer path".to_string()))?)?,
+            );
+        }
+        Ok(())
+    }
+
+    pub fn delete_clip_tokenizer(&self) -> Result<(), AppError> {
+        let mut tok = self.CLIPtokenizer.lock()?;
+        *tok = None;
+        Ok(())
+    }
+
+    pub fn delete_blip_tokenizer(&self) -> Result<(), AppError> {
+        let mut tok = self.BLIPtokenizer.lock()?;
         *tok = None;
         Ok(())
     }
@@ -89,9 +114,46 @@ impl BackendState {
         Ok(())
     }
 
+    pub fn create_blip_vision_model(&self) -> Result<(), AppError> {
+        let res = self.resource_path.as_ref().ok_or_else(|| AppError::CustomError("Resource path not set".to_string()))?;
+        let model_path = res.join("models").join("blip_vision.onnx");
+        let mut vm = self.BLIPvision_model.lock()?;
+        if vm.is_none() {
+            *vm = Some(
+                BLIPVisionEncoder::new(model_path.to_str().ok_or_else(|| AppError::CustomError("Invalid BLIP vision model path".to_string()))?)?,
+            );
+        };
+        Ok(())
+    }
+
+    // the itm cross encoder, has to see the text so it runs once per pair
+    pub fn create_blip_itm_model(&self) -> Result<(), AppError> {
+        let res = self.resource_path.as_ref().ok_or_else(|| AppError::CustomError("Resource path not set".to_string()))?;
+        let model_path = res.join("models").join("blip_itm.onnx");
+        let mut im = self.BLIPitm_model.lock()?;
+        if im.is_none() {
+            *im = Some(
+                BLIPitmHead::new(model_path.to_str().ok_or_else(|| AppError::CustomError("Invalid BLIP itm model path".to_string()))?)?,
+            );
+        };
+        Ok(())
+    }
+
     pub fn delete_vision_model(&self) -> Result<(), AppError> {
         let mut tm = self.vision_model.lock()?;
         *tm = None;
+        Ok(())
+    }
+
+    pub fn delete_blip_vision_model(&self) -> Result<(), AppError> {
+        let mut vm = self.BLIPvision_model.lock()?;
+        *vm = None;
+        Ok(())
+    }
+
+    pub fn delete_blip_itm_model(&self) -> Result<(), AppError> {
+        let mut im = self.BLIPitm_model.lock()?;
+        *im = None;
         Ok(())
     }
 
@@ -218,3 +280,13 @@ pub struct Progress {
     pub done: usize,
     pub total: usize,
 }
+
+
+// Used for each clip model defining inout sizes and tpye and power and name etc
+// also normalization techniques
+// #[derive(Serialize, Clone)]
+// pub struct CLIPModelSpecification {
+//     name: ,
+//     code: ,
+//     tier: ,
+// }
