@@ -9,6 +9,165 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tauri::{AppHandle, Emitter};
 
+
+// Temp CLIP stuff
+
+// This function will be a function that frontend can call to basically pass in ids of img
+// to basically run the blips on score it and it returns map of list to blip scoring back to frontend in
+// case it needed to use it
+// these just return the clip score 
+#[tauri::command]
+pub async fn rerank_batch_image( ids: Vec<u64>, state: tauri::State<'_, Arc<BackendState>>) -> Result<Vec<f32>, AppError> {
+
+    todo!()
+
+}
+
+fn rerank_batch_image_inner(ids: Vec<u64>, state: &BackendState) -> Result<Vec<f32>, AppError> {
+   
+    todo!()
+}
+
+// Same as above but this is just for single id doing the same proces, return a pair
+#[tauri::command]
+pub async fn rerank_single_image( id: u64, state: tauri::State<'_, Arc<BackendState>>) -> Result<f32, AppError> {
+
+    todo!()
+
+}
+
+fn rerank_single_image_inner(id: u64, state: &BackendState) -> Result<f32, AppError> {
+
+       todo!()
+
+}
+
+
+// Takes in view of vec of image order (ids)
+// returns ids mapped to its filepath as given from cache 
+// utility function
+
+pub fn get_file_paths_from_ids_from_cache(ids: &Vec<ImageOrder>, state: &BackendState) -> Result<Vec<(u64, PathBuf)>, AppError> {
+    let cache_guard = state.workspace_cache.lock()?;
+
+    let current_album = cache_guard.as_ref().ok_or_else(|| AppError::CustomError("Workspace Cache not set in backend".to_string()))?;
+    let cache = current_album.album.as_ref().ok_or_else(|| AppError::CustomError("Workspace Cache not set in backend".to_string()))?;
+
+    let file_paths: Vec<(u64, PathBuf)> = ids
+        .into_iter()
+        .filter_map(|pair| {
+            // get the path from the cache keyed by the id
+            cache.get(&pair.id).map(|image| (pair.id, image.path.clone())) // return the id + path from closure
+        })
+        .collect();
+
+    Ok(file_paths)
+}
+
+// Current one using for MVP
+// FE will call 2 stages on FE side first the clip query side and 
+
+// after callign process query it will call this
+// this function needs to receive a list of ids that frontend wants to reorder (since BE doesn tknow the ordering for each query since it never saves it)
+// it also needs to get score assoc with id in order for backend to do "all the work" and only have FE just change that block ordering
+// so this can either return a full list or list of ordered pairs that frontend requested.
+// I think the return sorted list of ordered pairs is better and basically just let the frontend merge it back in 
+
+#[tauri::command]
+pub async fn hybrid_process_query_decoupled(reranking_query: String, rerank_pairs: Vec<ImageOrder>, state: tauri::State<'_, Arc<BackendState>>, app: tauri::AppHandle) -> Result<Vec<ImageOrder>, AppError> {
+    let state = state.inner().clone();
+    let app = app.clone();
+
+    tokio::task::spawn_blocking(move || hybrid_process_query_decoupled_inner(reranking_query, rerank_pairs, &state, &app))
+    .await?
+}
+
+
+fn hybrid_process_query_decoupled_inner(reranking_query: String, rerank_pairs: Vec<ImageOrder>, state: &BackendState, app: &AppHandle) -> Result<Vec<ImageOrder>, AppError> {
+    // This function psuedo process is:
+    // create BLIP Models
+    // for each imageorder in vec
+    // do the preprocessing
+    // run it through the blip vision batch
+    // get those results run it throuhg the blip itm head to get list of those scores
+    // zip and iterate through the vec imord and the scores and add it to it
+    // sort the vec by scores which should be changed
+    // return that new to FE to merge in
+    state.create_blip_vision_model()?;
+    state.create_blip_itm_model()?;
+    state.create_blip_tokenizer()?;
+
+    // tokenize the input
+    // get the mask
+    let blip_tok_guard = state.BLIPtokenizer.lock()?;
+    let blip_tok = blip_tok_guard.as_ref().ok_or_else(|| AppError::CustomError("BLIP Tokenizer not initialized".to_string()))?;
+    let (tokenized, mask) = blip_tok.tokenize_input(&reranking_query)?;
+
+    let file_paths: Vec<(u64, PathBuf)> = get_file_paths_from_ids_from_cache(&rerank_pairs, state)?;
+    let tensors: Vec<(u64, Array4<f32>)> = preprocess_images_blip(file_paths)?;
+
+    let blip_vm_guard = state.BLIPvision_model.lock()?;
+    let vision_embeddings = blip_vm_guard
+        .as_ref()
+        .ok_or_else(|| AppError::CustomError("BLIP Vision Model not loaded".to_string()))?
+        .encode_batch_with_progress(tensors, app)?;
+
+    let blip_itmh_guard = state.BLIPitm_model.lock()?;
+    let scores = blip_itmh_guard
+        .as_ref()
+        .ok_or_else(|| AppError::CustomError("BLIP ITM Model not loaded".to_string()))?
+        .itm_match_batch(vision_embeddings, tokenized, mask)?;
+
+    let score_deltas: HashMap<u64, f32> = scores
+        .into_iter()
+        .map(|(id, (no_match, matched))| (id, matched - no_match))
+        .collect();
+
+    let mut reranked: Vec<ImageOrder> = rerank_pairs;
+    for pair in reranked.iter_mut() {
+        if let Some(delta) = score_deltas.get(&pair.id) {
+            pair.confidence_score = pair.confidence_score + delta;
+        }
+    }
+
+    reranked.sort_by(|a,b| {
+        b.confidence_score.partial_cmp(&a.confidence_score).unwrap()
+    });
+
+    Ok(reranked)
+}
+
+
+// process query but this will run the blip reranker
+// this is non streaming so frontend will pause while it does the top n reranking to rereank top n
+// this will call upon blip usage stuff
+// This is able to be done since only returns the final in non staged matter 
+// But user will be blocked when they input a search
+// keep for the s&giggles
+// #[tauri::command]
+// pub async fn hybrid_process_query() -> Result<(), AppError> {
+
+// }
+
+// basically returns clip for the time being and then after all blip rerank done it reorders once
+// so basically this func needs to return 2 things at diff times might not be good
+// since one backend function is ret multiple thigns over time this eneds to be a channel 
+// so this is diff
+// NOT DO FOR NOW
+// #[tauri::command]
+// pub async fn hybrid_process_query_staged() -> Result<(), AppError> {
+
+// }
+
+
+// as blip goes through it reranks in a stream,ing way so updating frequently
+// NOT DO FOR NOW
+// #[tauri::command]
+// pub async fn hybrid_process_query_streamed() -> Result<(), AppError> {
+
+// }
+
+
 use crate::{
     cosine_sim::compute_sim,
     db::{create_albumn, load_albumn},
