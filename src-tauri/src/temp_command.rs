@@ -1,7 +1,9 @@
 // claude diff test
 use crate::errors::AppError;
 use crate::temp_models::{JsonAlbum, Progress};
+use ndarray::Array4;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicI64;
@@ -171,7 +173,7 @@ fn hybrid_process_query_decoupled_inner(reranking_query: String, rerank_pairs: V
 use crate::{
     cosine_sim::compute_sim,
     db::{create_albumn, load_albumn},
-    preprocessing::{find_image_paths, merge_image_and_embeddings, preprocess_album, preprocess_album_chunked, valid_path_chunking, create_thumbnail_dir},
+    preprocessing::{find_image_paths, merge_image_and_embeddings, preprocess_album, preprocess_album_chunked, preprocess_images_blip, valid_path_chunking, create_thumbnail_dir},
     temp_models::{AlbumView, BackendState, Image, ImageOrder, ImageView},
 };
 
@@ -290,6 +292,10 @@ pub async fn create_workspace(
     Ok("done".to_string())
 }
 
+// TODO
+// in teh future do not have the .unzip()
+// and the 2 diff accumulating vecs and this avoid needing to merge them back in the end for the caller
+// just change downstream function signatures to make sure it is more in sync 
 fn chunked_preprocess_indexing_wrapper(
     app: &AppHandle,
     chunked_paths: Vec<Vec<PathBuf>>,
@@ -467,9 +473,7 @@ pub async fn load_workspace(
     Ok(())
 }
 
-// TODO this function needs to also maybe give a default list of ordered ids for when the user did not query but still want ot show images
 fn load_workspace_inner(album_name: String, state: &BackendState) -> Result<(), AppError> {
-    // Similar to create_workspace_inner
     // just load from sqlite to the cache and then ret ok when process is done
 
     load_albumn(album_name, state)?;
@@ -564,9 +568,9 @@ pub fn process_query_inner(
     state: &BackendState,
 ) -> Result<Vec<ImageOrder>, AppError> {
     state.create_text_model()?;
-    state.create_tokenizer()?;
+    state.create_clip_tokenizer()?;
 
-    let tokenizer_guard = state.tokenizer.lock()?;
+    let tokenizer_guard = state.CLIPtokenizer.lock()?;
     let tokenizer = tokenizer_guard
         .as_ref()
         .ok_or_else(|| AppError::CustomError("Tokenizer not initialized".to_string()))?;
@@ -707,10 +711,24 @@ pub fn add_album_to_json_file(album_name: String, album_description: String, roo
     Ok(())
 }
 
-// TODO
 // change the album name in the json file utility func
-pub fn edit_album_name_json_file(album_name: String, new_album_name: String, state: &BackendState) -> Result<(), AppError> {
-    
+pub fn edit_album_name_json_file(album_name: &str, new_album_name: &str, state: &BackendState) -> Result<(), AppError> {
+    let db_path = state
+        .local_db_storage_path
+        .as_ref()
+        .ok_or_else(|| AppError::CustomError("DB storage path not set".to_string()))?;
+
+    let json_path = db_path.join("workspaces.json");
+    let mut albums_temp: Vec<JsonAlbum> = load_workspace_json(&json_path)?;
+
+    for album in albums_temp.iter_mut() {
+        if album.name == album_name {
+            album.name = new_album_name.to_string();
+        }
+    }
+
+    write_workspace_json(&json_path, albums_temp)?;
+
     Ok(())
 }
 
@@ -748,25 +766,71 @@ pub fn delete_album_description_inner(
     Ok(())
 }
 
-// basically will change album name in db file, thumbnail file, 
-// Add this in later !!
+// basically will change album name in db file, thumbnail file, and the json record
+#[tauri::command]
+pub async fn change_album_name(
+    album_name: String,
+    new_album_name: String,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), AppError> {
+    let state = state.inner().clone();
+    tokio::task::spawn_blocking(move || {
+        change_album_name_inner(&album_name, &new_album_name, &state)
+    })
+    .await?
+}
 
-// #[tauri::command]
-// pub async fn change_album_name() -> Result<(), String> {
+fn change_album_name_inner(
+    album_name: &str,
+    new_album_name: &str,
+    state: &BackendState,
+) -> Result<(), AppError> {
+    change_db_file_name(album_name, new_album_name, state)?;
+    change_thumbnail_folder_name(album_name, new_album_name, state)?;
+    edit_album_name_json_file(album_name, new_album_name, state)?;
 
-// }
+    Ok(())
+}
 
-// fn change_album_name_inner() -> Result<> {
+fn change_db_file_name(
+    album_name: &str,
+    new_album_name: &str,
+    state: &BackendState,
+) -> Result<(), AppError> {
+    let db_path = state
+        .local_db_storage_path
+        .as_ref()
+        .ok_or_else(|| AppError::CustomError("DB storage path not set".to_string()))?;
 
-// }
+    let db_file = db_path.join(format!("{}.db", album_name));
+    let new_db_file = db_path.join(format!("{}.db", new_album_name));
 
-// fn change_db_file_name() -> Result<()> {
-    
-// }
+    if db_file.exists() {
+        std::fs::rename(&db_file, &new_db_file)?;
+    }
 
-// fn change_thumbnail_folder_name() -> Result<()> {
-    
-// }
+    Ok(())
+}
+
+fn change_thumbnail_folder_name(
+    album_name: &str,
+    new_album_name: &str,
+    state: &BackendState,
+) -> Result<(), AppError> {
+    let thumbnail_path = state
+        .local_thumbnail_storage_path
+        .as_ref()
+        .ok_or_else(|| AppError::CustomError("Thumbnail storage path not set".to_string()))?;
+
+    let thumbnail_folder = thumbnail_path.join(format!("{}", album_name));
+    let new_thumbnail_folder = thumbnail_path.join(format!("{}", new_album_name));
+
+    if thumbnail_folder.exists() {
+        std::fs::rename(&thumbnail_folder, &new_thumbnail_folder)?;
+    }
+
+    Ok(())
+}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // TODO these functions drive actiosn that can be done for selected items
