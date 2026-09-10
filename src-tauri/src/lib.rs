@@ -103,7 +103,10 @@ pub fn run() {
                 workspace_cache: Mutex::new(None),
                 vision_model: Mutex::new(None),
                 text_model: Mutex::new(None),
-                tokenizer: Mutex::new(None),
+                CLIPtokenizer: Mutex::new(None),
+                BLIPtokenizer: Mutex::new(None),
+                BLIPvision_model: Mutex::new(None),
+                BLIPitm_model: Mutex::new(None),
             });
 
             // // TODO: set up 
@@ -121,12 +124,14 @@ pub fn run() {
             temp_command::delete_workspace,
             temp_command::find_workspaces,
             temp_command::process_query,
+            temp_command::hybrid_process_query_decoupled,
             temp_command::process_query_image,
             temp_command::lazy_load_data,
             temp_command::lazy_load_data_single,
             temp_command::get_default_ids,
             temp_command::add_album_description,
             temp_command::delete_album_description,
+            temp_command::change_album_name,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
