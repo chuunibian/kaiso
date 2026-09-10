@@ -2,7 +2,7 @@ use crate::errors::AppError;
 use anyhow::{Context, Result};
 use exif;
 use fast_image_resize::images::Image as FirImage;
-use fast_image_resize::{PixelType, ResizeOptions, Resizer};
+use fast_image_resize::{FilterType as FirFilter, ResizeAlg, PixelType, ResizeOptions, Resizer};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageFormat, ImageReader, RgbImage};
@@ -20,9 +20,120 @@ use twox_hash::XxHash64;
 
 use crate::temp_models::{Image, ImageDimensions, ImageMetadata};
 
+// mobileclip2-b: 224px, and it normalizes with mean 0 / std 1, so this is a plain /255
+// (see model_exporter/mobileclip2-b/model_spec.json)
 const CLIP_SIZE: u32 = 224;
-const CLIP_MEAN: [f32; 3] = [0.48145466, 0.4578275, 0.40821073];
-const CLIP_STD: [f32; 3] = [0.26862954, 0.26130258, 0.27577711];
+const CLIP_MEAN: [f32; 3] = [0.0, 0.0, 0.0];
+const CLIP_STD: [f32; 3] = [1.0, 1.0, 1.0];
+
+// Temp BLIP changes ----------------------------------------------------------------------------------------
+
+const BLIP_SIZE: u32 = 384;
+const BLIP_MEAN: [f32; 3] = [0.48145466, 0.4578275, 0.40821073];
+const BLIP_STD: [f32; 3] = [0.26862954, 0.26130258, 0.27577711];
+
+// this one for blip
+fn resize_image_blip(rgb: RgbImage, target_size: u32) -> Result<RgbImage> {
+    let (w, h) = rgb.dimensions();
+
+    let src = FirImage::from_vec_u8(w, h, rgb.into_raw(), PixelType::U8x3)?;
+
+    let mut dst = FirImage::new(target_size, target_size, PixelType::U8x3);
+    let mut resizer = Resizer::new();
+    resizer.resize(
+        &src,
+        &mut dst,
+        &ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FirFilter::CatmullRom)),
+    )?;
+
+    let resized = RgbImage::from_raw(target_size, target_size, dst.into_vec())
+        .context("failed to rebuild RgbImage from resized buffer")?;
+
+    Ok(resized)
+}
+
+fn preprocess_rgb_image_to_blip(img: RgbImage) -> Array4<f32> {
+    let (w, h) = (img.width() as usize, img.height() as usize);
+    debug_assert_eq!(w, BLIP_SIZE as usize);
+    debug_assert_eq!(h, BLIP_SIZE as usize);
+
+    let plane = w * h;
+    let raw = img.into_raw();
+
+    let mut chw = vec![0f32; 3 * plane];
+    let (r_plane, rest) = chw.split_at_mut(plane);
+    let (g_plane, b_plane) = rest.split_at_mut(plane);
+
+    for i in 0..plane {
+        let base = i * 3;
+        r_plane[i] = (raw[base] as f32 / 255.0 - BLIP_MEAN[0]) / BLIP_STD[0];
+        g_plane[i] = (raw[base + 1] as f32 / 255.0 - BLIP_MEAN[1]) / BLIP_STD[1];
+        b_plane[i] = (raw[base + 2] as f32 / 255.0 - BLIP_MEAN[2]) / BLIP_STD[2];
+    }
+
+    // fromshapevec takes a flat vector and turns it into that targeted dimension
+    Array4::from_shape_vec((1, 3, h, w), chw).expect("shape is correct by construction")
+}
+
+
+// Takes in id + path pairs
+// whoever is calling needs ot get all the paths for the list of ids and pass it into here
+// the id rides along with the tensor so nothing downstream has to line up two vecs by index
+// an image that fails to load is just dropped, it keeps its clip score in the rerank
+pub fn preprocess_images_blip(paths: Vec<(u64, PathBuf)>) -> Result<Vec<(u64, Array4<f32>)>, AppError> {
+
+    let tensors: Vec<(u64, Array4<f32>)> = paths
+    .par_iter()
+    .filter_map(|(id, path)| {
+        let img = load_and_orient_image(path).ok()?;
+        let rgb = recolor_image(img);
+        let sq  = resize_image_blip(rgb, BLIP_SIZE).ok()?;
+        let temp = preprocess_rgb_image_to_blip(sq);
+
+        return Some((*id, temp));
+    })
+    .collect();
+
+    Ok(tensors)
+}
+
+// Takes in paths 
+// whoever is calling needs ot get all the paths for the list of ids and pass it into here
+// TODO Incomplete
+pub fn preprocess_images_blip_chunked(paths: Vec<(u64, PathBuf)>) -> Result<Vec<(u64,Array4<f32>)>, AppError> {
+
+    // let tensors: Vec<Array4<f32>> = paths
+    // .par_iter()
+    // .map(|id, path| {
+    //     let img = load_and_orient_image(path).unwrap();
+    //     let rgb = recolor_image(img);
+    //     let sq  = resize_image(rgb, BLIP_SIZE).unwrap();
+    //     let temp = preprocess_rgb_image_to_blip(sq)
+
+    //     return (id, temp)
+    // })
+    // .collect();
+
+    // Ok(tensors)
+
+    todo!()
+
+}
+
+
+// I would say pass in a batch of ids for the blip to process
+// pub fn blip_rerank_batch() -> Result<(), AppError> {
+//     // recieves the list of tensors and gets the global state model and runs them via batch
+//     // returns list of tuple id to score or a hashmap 
+// }
+
+
+// Just a single shot one for blip
+// pub fn blip_rerank_single() {
+//     // only takes in 1 tensor
+// }
+
+// --------------------------------------------------------------------------------------------------------
 
 // gets an FS path to albumn scans it and returns valid image paths
 pub fn process_album_image_paths(albumn_path: &Path) -> Result<Vec<PathBuf>, AppError> {
@@ -98,21 +209,20 @@ pub fn parallized_preproc_to_tensor(
 ) -> Result<Vec<(Image, Array4<f32>)>, AppError> {
     let tensors: Vec<(Image, Array4<f32>)> = chunked_paths
         .par_iter()
-        .map(|path| {
+        .filter_map(|path| {
             let image_id = autoinc_counter.fetch_add(1, Ordering::Relaxed) as u64;
 
-            let (temp_img, temp1) = load_image(path, image_id).unwrap();
+            let (temp_img, temp1) = load_image(path, image_id).ok()?;
             let mut temp2 = recolor_image(temp1);
-            let temp_thumb_resize = resize_image_thumb(&mut temp2).unwrap();
-            let temp3 = resize_image(temp2, target_size as u32).unwrap();
+            let temp_thumb_resize = resize_image_thumb(&mut temp2).ok()?;
+            let temp3 = resize_image(temp2, target_size as u32).ok()?;
 
             // for thumbnail !!!
-            temp_thumbnail_save(&temp_thumb_resize, image_id, thumbnail_path, album_name)
-                .expect("failed to save thumbnail.");
+            temp_thumbnail_save(&temp_thumb_resize, image_id, thumbnail_path, album_name).ok()?;
 
             let temp4 = preprocess_rgb_image_to_clip(temp3);
 
-            (temp_img, temp4)
+            Some((temp_img, temp4))
         })
         .collect();
 
@@ -231,6 +341,18 @@ fn orient(img: DynamicImage, orientation: u32) -> DynamicImage {
         8 => img.rotate270(),
         _ => img,
     }
+}
+
+// Decode + exif orient only, blip does not need the Image struct or any of its metadata
+fn load_and_orient_image(path: &PathBuf) -> Result<DynamicImage> {
+    let decoded = ImageReader::open(&path)?
+        .with_guessed_format()?
+        .decode()
+        .with_context(|| format!("decode failed: {}", path.display()))?;
+
+    let orientation = get_exif_orientation(path);
+
+    Ok(orient(decoded, orientation))
 }
 
 // Decode once, build the Image struct, orient, hand both downstream.
