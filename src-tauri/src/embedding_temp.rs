@@ -366,8 +366,9 @@ impl ClipTextModel {
         self.model = None;
     }
 
-    // mobileclip2-b's text graph takes input_ids only, no attention_mask
-    pub fn embed_single(&self, tokenized: Vec<i64>, _mask: Vec<i64>) -> Result<Vec<f32>, AppError> {
+    // attention mask arguement might change based on what model is used 
+    // in future a model descriptor struct will be passed in for conformity
+    pub fn embed_single(&self, tokenized: Vec<i64>, mask: Vec<i64>) -> Result<Vec<f32>, AppError> {
         let id_shape: [usize; 2] = [1, 77];
 
         let model_opt = self.model.as_ref().ok_or_else(|| AppError::CustomError("Clip Text Model not loaded".to_string()))?;
