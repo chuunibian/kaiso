@@ -2,11 +2,11 @@
 import { forwardRef, useEffect, useRef } from "react";
 import { VirtuosoGrid, VirtuosoProps, type ListRange } from "react-virtuoso";
 import { invoke } from "@tauri-apps/api/core";
-import { Check } from "lucide-react";
+import { Check, Layers } from "lucide-react";
 
 import { Skeleton } from "./ui/skeleton";
 import { virtuosoGridRef } from "../lib/grid-ref";
-import { useGridStore, useBottomBarStore, useConfigStore, useOverviewPanelStore, useTopBarStateStore, useSelectedEntitiesStore, handleBackendError } from "../lib/store";
+import { useGridStore, useBottomBarStore, useConfigStore, useOverviewPanelStore, useTopBarStateStore, useSelectedEntitiesStore, useSearchModeStore, SearchMode, handleBackendError } from "../lib/store";
 import type { ImageView } from "../lib/types";
 import { formatSize } from "../lib/utils";
 
@@ -19,7 +19,6 @@ async function fetchBatch(ids: number[]): Promise<ImageView[]> {
         return [];
     }
 }
-
 
 // truncate a filename in the middle: "Screenshot_20250101_abcdef.png" → "Scree…def.png"
 function truncateFilename(name: string, maxLen = 18): string {
@@ -34,7 +33,7 @@ function truncateFilename(name: string, maxLen = 18): string {
 }
 
 // grid cell — file-manager thumbnail style
-function ImageCell({ id, score }: { id: number; score: number }) {
+function ImageCell({ id, score, inRerankWindow }: { id: number; score: number; inRerankWindow: boolean }) {
     const row = useGridStore((s) => s.cache.get(id));
     const setPreviewFlag = useConfigStore((s) => s.setPreviewFlag);
     const setCurrentPreviewPath = useConfigStore((s) => s.setCurrentPreviewPath);
@@ -127,12 +126,19 @@ function ImageCell({ id, score }: { id: number; score: number }) {
                         <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
                     </div>
                 )}
-                {/* Confidence score badge */}
-                {score > 0 && (
-                    <div className="absolute top-2 right-2 bg-zinc-950/80 backdrop-blur-md text-xs text-zinc-300 group-hover:text-pink-300 border border-zinc-700/50 shadow-md px-2 py-0.5 rounded-full font-mono leading-none select-none">
-                        {score.toFixed(3)}
+                {/* Sits inside the blip rerank window */}
+                {inRerankWindow && (
+                    <div
+                        title="In the BLIP rerank window"
+                        className="absolute bottom-1.5 left-1.5 w-5 h-5 rounded-full bg-emerald-500 border border-emerald-300/60 shadow-lg shadow-emerald-500/40 flex items-center justify-center"
+                    >
+                        <Layers className="w-3 h-3 text-white" strokeWidth={2.5} />
                     </div>
                 )}
+                {/* Confidence score badge */}
+                <div className="absolute top-2 right-2 bg-zinc-950/80 backdrop-blur-md text-xs text-zinc-300 group-hover:text-pink-300 border border-zinc-700/50 shadow-md px-2 py-0.5 rounded-full font-mono leading-none select-none">
+                    {score.toFixed(3)}
+                </div>
             </div>
 
             {/* File info below thumbnail */}
@@ -159,6 +165,8 @@ const Scroller = forwardRef<HTMLDivElement, any>(
 
 export default function TestGrid() {
     const orderedIds = useGridStore((s) => s.orderedIds);
+    const searchMode = useSearchModeStore((s) => s.searchMode);
+    const rerankTopN = useSearchModeStore((s) => s.rerankTopN);
     const setRange = useBottomBarStore((s) => s.setRange);
     const setStatus = useBottomBarStore((s) => s.setStatus);
     const gridSize = useTopBarStateStore((s) => s.gridSize);
@@ -233,7 +241,13 @@ export default function TestGrid() {
                     ref={virtuosoGridRef}
                     style={{ height: "100%", width: "100%" }}
                     totalCount={orderedIds.length}
-                    itemContent={(i) => <ImageCell id={orderedIds[i].id} score={orderedIds[i].confidence_score} />}
+                    itemContent={(i) => (
+                        <ImageCell
+                            id={orderedIds[i].id}
+                            score={orderedIds[i].confidence_score}
+                            inRerankWindow={searchMode === SearchMode.ClipBlip && i < rerankTopN}
+                        />
+                    )}
                     rangeChanged={onRangeChanged}
                     isScrolling={(s) => setStatus(s)}
                     increaseViewportBy={200}

@@ -140,6 +140,55 @@ export const useGridStore = create<FrontendGridStore>((set) => ({
     setIsSearching: (searching) => set({ isSearching: searching }),
 }));
 
+export enum SearchWay {
+    Semantic = 'Semantic',
+    Filename = 'Filename',
+    SemanticFilename = 'Semantic Filename',
+}
+
+export enum SearchMode {
+    Clip = 'CLIP',
+    ClipBlip = 'CLIP+BLIP',
+}
+
+export enum SearchStage {
+    Idle = 'Idle',
+    Clip = 'Clip',
+    Blip = 'Blip',
+}
+
+interface SearchModeStore {
+    searchWay: SearchWay;
+    searchMode: SearchMode;
+    rerankTopN: number; // the N of the top N window handed to the blip reranker
+    searchStage: SearchStage;
+    rerankDone: number; // blip-progress emits from the backend
+    rerankTotal: number;
+    setSearchWay: (searchWay: SearchWay) => void;
+    setSearchMode: (searchMode: SearchMode) => void;
+    setRerankTopN: (rerankTopN: number) => void;
+    setSearchStage: (searchStage: SearchStage) => void;
+    setRerankProgress: (done: number, total: number) => void;
+}
+
+export const useSearchModeStore = create<SearchModeStore>((set) => ({
+    searchWay: SearchWay.Semantic,
+    searchMode: SearchMode.Clip,
+    rerankTopN: 20,
+    searchStage: SearchStage.Idle,
+    rerankDone: 0,
+    rerankTotal: 0,
+    setSearchWay: (searchWay: SearchWay) => set({ searchWay: searchWay }),
+    setSearchMode: (searchMode: SearchMode) => set({ searchMode: searchMode }),
+    setRerankProgress: (done: number, total: number) => set({ rerankDone: done, rerankTotal: total }),
+    setRerankTopN: (rerankTopN: number) => {
+        if (rerankTopN > 0 && rerankTopN <= 999) {
+            set({ rerankTopN: rerankTopN })
+        }
+    },
+    setSearchStage: (searchStage: SearchStage) => set({ searchStage: searchStage }),
+}));
+
 interface ScrollRange {
     startIndex: number;
     endIndex: number;
