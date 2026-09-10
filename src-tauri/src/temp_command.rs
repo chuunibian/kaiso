@@ -373,6 +373,62 @@ fn create_workspace_inner(
     Ok(())
 }
 
+// the previous version of create workspace that was nonchunked
+fn create_workspace_inner_nonchunked(
+    target: &str,
+    album_name: String,
+    album_description: String,
+    state: &BackendState,
+    app: &AppHandle,
+) -> Result<(), AppError> {
+
+    let path: &Path = Path::new(target);
+    let thumbnail_path = state
+        .local_thumbnail_storage_path
+        .as_ref()
+        .ok_or_else(|| AppError::CustomError("Thumbnail storage path not set".to_string()))?;
+
+    emit_utility(app, "create-workspace", "Scanning for valid image paths...")?;
+    let valid_image_paths: Vec<PathBuf> = find_image_paths(path);
+    let id_counter = AtomicI64::new(0); // each workspace creation needs new auto inc id counter
+
+    emit_utility(app, "create-workspace", "Preprocessing images...")?;
+    let preproc_start = std::time::Instant::now();
+    create_thumbnail_dir(&thumbnail_path, &album_name)?; // create the thumbnail dir for new workspace
+    let prepared = preprocess_album(valid_image_paths, thumbnail_path, &album_name, &id_counter)?;
+    let preproc_duration = preproc_start.elapsed();
+    let (images, tensors) = prepared.into_iter().unzip();
+
+    state.create_vision_model()?;
+
+    emit_utility(app, "create-workspace", "Embedding images...")?;
+    let vm_guard = state.vision_model.lock()?;
+    let inference_start = std::time::Instant::now();
+    let embeddings: Vec<Vec<f32>> = vm_guard.as_ref().unwrap().embed_batch_list_with_progress(tensors, app)?;
+    let inference_duration = inference_start.elapsed();
+
+    // Drop lock release vm and then delete vm as not needed
+    drop(vm_guard);
+    state.delete_vision_model()?;
+
+    // Merge uncomplete Image with embeddings to complete the list of Img
+    let cache = merge_image_and_embeddings(images, embeddings)?;
+
+    // set the active cache to newly created map
+    state.set_active_cache(cache)?;
+
+    // call db functions for this create album
+    // Reads from the BE cache
+    emit_utility(app, "create-workspace", "Creating workspace in database...")?;
+    create_albumn(album_name.clone(), state)?;
+
+    // create the album in the json file
+    emit_utility(app, "create-workspace", "Finalizing workspace...")?;
+    add_album_to_json_file(album_name.clone(), album_description, target.to_string(), std::time::SystemTime::now(), state)?;
+
+    Ok(())
+}
+
 // TODO in the future use to determine if chunking process is needed 
 // and will also return in the future the recommended chunk size if chunking is needed
 // pub fn detect_chunking() -> Result<(), AppError> {
